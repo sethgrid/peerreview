@@ -4,56 +4,33 @@ import (
 	"database/sql"
 	"flag"
 	"log"
+	"math/rand"
 	"net/http"
+	"time"
+
 	"os"
 
 	"github.com/facebookgo/flagenv"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const schemaVersion = "2017-07-03-07:22"
+const keyLength = 36
+const ctxEmail = "email"
 
-func createDB(path string) error {
-	var db *sql.DB
-	var err error
-
-	db, err = sql.Open("sqlite3", path)
-	if err != nil {
-		log.Fatalf("unable to open %s - %v", path, err)
+func init() {
+	if _, err := os.Stat("oauth_config.json"); err != nil {
+		log.Fatal("oauth_config.json not found. Download the file contents from https://console.developers.google.com/apis/credentials. See README.md for more details.")
 	}
-	defer db.Close()
-	defer func() {
-		if err != nil {
-			err = os.Remove(path)
-			if err != nil {
-				log.Println("unable to remove database file ", err)
-			}
+	InitAuth()
+	go func() {
+		for _ = range time.Tick(5 * time.Minute) {
+			PruneAuth()
 		}
 	}()
-
-	q := `
-	create table schema_version (version text not null primary key);
-	create table users (id integer not null primary key, name text, email text, goals text);
-	create table teams (id integer not null primary key, name text);
-	create table user_teams (id integer not null primary key, user_id integer, team_id integer, FOREIGN KEY(user_id) REFERENCES users(id), FOREIGN KEY(team_id) REFERENCES teams(id));
-	create table review_cycles (id integer not null primary key, name text, is_open boolean);
-	create table reviews (id integer not null primary key, recipient_id integer, review_cycle_id integer, feedback text, is_strength boolean, is_growth_opportunity boolean, FOREIGN KEY(recipient_id) REFERENCES users(id), FOREIGN KEY(review_cycle_id) REFERENCES review_cycles(id));
-	create table review_requests (id integer not null primary key, recipient_id integer, reviewer_id integer, cycle_id integer, FOREIGN KEY (recipient_id) REFERENCES user(id), FOREIGN KEY (reviewer_id) REFERENCES user(id), FOREIGN KEY (cycle_id) REFERENCES review_cycles(id));
-	`
-	_, err = db.Exec(q, schemaVersion)
-	if err != nil {
-		return errors.Wrapf(err, "query: %q", q)
-	}
-
-	q = "insert into schema_version (version) values (?)"
-	_, err = db.Exec(q, schemaVersion)
-	if err != nil {
-		return errors.Wrapf(err, "query: %q", q)
-	}
-	return nil
 }
 
 func main() {
@@ -62,16 +39,9 @@ func main() {
 	flagenv.Parse()
 	flag.Parse()
 
-	if _, err := os.Stat(dbfile); os.IsNotExist(err) {
-		log.Printf("creating %s", dbfile)
-		err := createDB(dbfile)
-		if err != nil {
-			log.Fatal("unable to create db", err)
-		}
-	} else if err != nil {
-		log.Fatal("unexpected error looking for sqlite3 db file", err)
-	} else {
-		log.Printf("%s found", dbfile)
+	err := initDB(dbfile)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	db, err := sql.Open("sqlite3", dbfile)
@@ -84,35 +54,53 @@ func main() {
 		log.Fatal("unable to ping the db", err)
 	}
 
-	row := db.QueryRow("select version from schema_version")
-	var detectedSchemaVersion string
-	err = row.Scan(&detectedSchemaVersion)
+	err = verifyDB(db)
 	if err != nil {
-		log.Fatalf("unable to determine schema version - %v", err)
+		log.Fatal(err)
 	}
-	if detectedSchemaVersion != schemaVersion {
-		log.Fatalf("schema version has changed. Detected schema version: %q. App's schema version: %q. Remove or migrate the database.", detectedSchemaVersion, schemaVersion)
+
+	logger := logrus.New()
+	logger.Formatter = &logrus.JSONFormatter{
+		// disable, as we set our own
+		DisableTimestamp: true,
 	}
 
 	r := chi.NewRouter()
 
-	// A good base middleware stack
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
+	r.Use(NewStructuredLogger(logger))
 	r.Use(middleware.Recoverer)
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hi"))
+	// separate route created for this, intended to prevent logging of its request
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		// TOOD, serve favicon
 	})
 
-	log.Println("listening on :3333")
-	http.ListenAndServe(":3333", r)
+	r.Get("/", rootHandler)
+	r.With(AuthMW).Get("/dash", dashHandler)
+	r.Post("/tokensignin", tokenHandler)
 
-	log.Println("completed!")
+	// if you update the port, you have to update the Google Sign In Client
+	// at https://console.developers.google.com/apis/credentials
+	log.Println("listening on :3333")
+	if err := http.ListenAndServe(":3333", r); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func RandStringRunes(n int) string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.=-_")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }
 
 /*
+Planning:
+
 users
 id name email goals
 

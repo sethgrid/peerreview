@@ -1,0 +1,29 @@
+<html lang="en">
+  <head>
+    <title>Peer Review - Dash</title>
+    <meta name="google-signin-scope" content="profile email">
+    <meta name="google-signin-client_id" content="852295142503-q581jjeg6d20jc7opv2mgavo9ns6tja3.apps.googleusercontent.com">
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+  </head>
+  <body>
+    <script>
+    function signOut() {
+        var auth2 = gapi.auth2.getAuthInstance();
+        auth2.signOut().then(function () {
+            console.log('User signed out.');
+            document.cookie = 'auth=; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+            window.location.href = "/";
+        });
+    }
+
+    function onLoad() {
+      gapi.load('auth2', function() {
+        gapi.auth2.init();
+      });
+    }
+    </script>
+    you are logged in as {{ email }}. <br>
+    <a href="#" onclick="signOut();">Sign out</a>
+    <script src="https://apis.google.com/js/platform.js?onload=onLoad" async defer></script>
+  </body>
+</html>
