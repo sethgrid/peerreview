@@ -35,3 +35,13 @@ If the schema is changed, we have to adjust the schema version variable to preve
 Go1.8.1+ : there is an error in earlier versions for sqlite3. See https://github.com/golang/go/issues/19734.
 
 For the app to function, you will have to hook up Google Sign-In. See above.
+
+### TODO
+  - ~~set up sqlite3 as the backing datastore~~
+  - ~~set up schema versioning~~
+  - ~~set up google sign-in with ability to log in and log out~~
+  - set up alternate auth mw handling for bearer token that has the same content as the auth cookie value. Add documentation for curling with this.
+  - set up endpoints for all interactions
+  - set up /dash to be a single page application
+  - set up vendoring of web directory into binary
+  - vendor Go dependencies

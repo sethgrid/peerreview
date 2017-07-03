@@ -6,9 +6,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"time"
-
 	"os"
+	"time"
 
 	"github.com/facebookgo/flagenv"
 	"github.com/go-chi/chi"
