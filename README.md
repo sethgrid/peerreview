@@ -26,6 +26,10 @@ You will need to set up Google Sign-In.
 
 3) Download the .json config from your [Google API Console Credentials page](https://console.developers.google.com/apis/credentials) and move it to `oauth_config.json`.
 
+### API
+
+When a user signs in via Google Sign-In, there is a cookie created called `auth`, eg: `auth=XhfsnkIJPRwe_znXfhizqkVBtoD.AeXYVcRa`. This session token is stored in memory server side with an expiration of 24 hours. This same session token can be used to make API calls client side into the system using the `X-Session-Token` header. For example, `curl localhost:3333/dash --header "X-Session-Token: XhfsnkIJPRwe_znXfhizqkVBtoD.AeXYVcRa` and `curl localhost:3333/dash --cookie "auth=XhfsnkIJPRwe_znXfhizqkVBtoD.AeXYVcRa"` both will work. Any authenticated endpoint will check for either a valid auth cookie or x-session-token.
+
 ### Contributing
 
 To keep the deploy of `peerreview` simple, you must bundle all the required files (html, css, javascript).
@@ -40,7 +44,7 @@ For the app to function, you will have to hook up Google Sign-In. See above.
   - ~~set up sqlite3 as the backing datastore~~
   - ~~set up schema versioning~~
   - ~~set up google sign-in with ability to log in and log out~~
-  - set up alternate auth mw handling for bearer token that has the same content as the auth cookie value. Add documentation for curling with this.
+  - ~~set up alternate auth mw handling for bearer token that has the same content as the auth cookie value. Add documentation for curling with this~~
   - set up endpoints for all interactions
   - set up /dash to be a single page application
   - set up vendoring of web directory into binary

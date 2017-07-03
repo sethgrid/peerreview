@@ -26,6 +26,39 @@ func initDB(dbfile string) error {
 	return nil
 }
 
+// createUser idempotently creates a user. If the user already exists, nothing happens.
+func createUser(db *sql.DB, name, email string) (err error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "unable to begin tx for createUser")
+	}
+
+	defer func() {
+		if err != nil {
+			// attempt a rollback and return the original error
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+		if err != nil {
+			err = errors.Wrap(err, "error committing tx on createUser")
+		}
+	}()
+
+	row := tx.QueryRow("select id from users where email=? limit 1", email)
+	var id int
+	err = row.Scan(&id)
+	if err == sql.ErrNoRows || id == 0 {
+		_, err := tx.Exec("insert into users (name, email) values (?,?)", name, email)
+		if err != nil {
+			return errors.Wrap(err, "unable to create user")
+		}
+	} else if err != nil {
+		return errors.Wrap(err, "unexpected error in createUser")
+	}
+	return nil
+}
+
 func verifyDB(db *sql.DB) error {
 	row := db.QueryRow("select version from schema_version")
 	var detectedSchemaVersion string

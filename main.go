@@ -18,7 +18,14 @@ import (
 
 const schemaVersion = "2017-07-03-07:22"
 const keyLength = 36
-const ctxEmail = "email"
+const xSessionHeader = "x-session-token"
+
+type ctxType string
+
+var ctxEmail ctxType = "email"
+
+// DB is globally available
+var DB *sql.DB
 
 func init() {
 	if _, err := os.Stat("oauth_config.json"); err != nil {
@@ -38,30 +45,32 @@ func main() {
 	flagenv.Parse()
 	flag.Parse()
 
-	err := initDB(dbfile)
+	var err error
+
+	err = initDB(dbfile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := sql.Open("sqlite3", dbfile)
+	DB, err = sql.Open("sqlite3", dbfile)
 	if err != nil {
 		log.Fatalf("unable to open %s - %v", dbfile, err)
 	}
-	defer db.Close()
+	defer DB.Close()
 
-	if err := db.Ping(); err != nil {
+	if err := DB.Ping(); err != nil {
 		log.Fatal("unable to ping the db", err)
 	}
 
-	err = verifyDB(db)
+	err = verifyDB(DB)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	logger := logrus.New()
-	logger.Formatter = &logrus.JSONFormatter{
-		// disable, as we set our own
-		DisableTimestamp: true,
+	logger.Formatter = &logrus.TextFormatter{
+	// disable, as we set our own
+	// DisableTimestamp: true,
 	}
 
 	r := chi.NewRouter()

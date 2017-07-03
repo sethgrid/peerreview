@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -85,7 +86,47 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	key := RandStringRunes(keyLength)
 	SetAuth(key, info.Email, time.Now().Add(24*time.Hour))
+	err = createUser(DB, info.Name, info.Email)
+	log.Println("called createUser")
+	if err != nil {
+		log.Println("error in createUser ", err) // TODO better err handling
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.Write([]byte(key))
+}
+
+func AuthMW(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		var isAuthorized bool
+		var email string
+		var ok bool
+		var authVal string
+
+		cookie, err := r.Cookie("auth")
+		if err == nil {
+			authVal = cookie.Value
+		}
+
+		if authVal == "" {
+			// check for API key
+			authVal = r.Header.Get(xSessionHeader)
+		}
+
+		if email, ok = IsValidAuth(authVal); ok {
+			isAuthorized = true
+		}
+
+		if !isAuthorized {
+			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+			return
+		}
+
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, ctxEmail, email)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	}
+	return http.HandlerFunc(fn)
 }
 
 // JSONConfig is the format of the json file located

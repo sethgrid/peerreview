@@ -1,9 +1,6 @@
 package main
 
 import (
-	"context"
-	"log"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -54,28 +51,4 @@ func PruneAuth() {
 		}
 	}
 	auths.keys = keys
-}
-
-func AuthMW(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("auth")
-		if err != nil {
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-			return
-		}
-		var email string
-		var ok bool
-		if email, ok = IsValidAuth(cookie.Value); !ok {
-			log.Println("bad cookie. Tampering?")
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-			return
-		}
-		if email == "" {
-			log.Println("something has gone horribly wrong")
-		}
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, ctxEmail, email)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	}
-	return http.HandlerFunc(fn)
 }
