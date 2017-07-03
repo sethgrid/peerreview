@@ -108,6 +108,7 @@ func RandStringRunes(n int) string {
 
 /*
 Planning:
+Schemas:
 
 users
 id name email goals
@@ -130,24 +131,44 @@ id recipient_id reviewer_id cycle_id
 Workflow:
 user signs in with google.
 
+Pages and API:
 settings page
 they can adjust what team(s) they are on. Some managers have multiple teams, qa can have multiple teams. Many folks have one team.
 can set a goal description
 
+Resource                 Payload            Response
+GET     /api/teams                          {"teams":[$team_a, $team_b, $team_c]}
+GET     /api/user                           {"user":{"name": $name, "email", $email, "goal":$goal, "teams":[$team_a]}}
+POST    /api/user/team   {"team": $team}    201
+DELETE  /api/user/team   {"team": $team}    200
+POST    /api/user/goal   {"goal": $goal}    201
+
 submit review page
-user can see other team members (gravatar + name). When they click on a team member, they can enter multiple feedbacks under strength or growth is_growth_opportunity
+user can see other team members (name). When they click on a team member, they can enter multiple feedbacks under strength or growth is_growth_opportunity
 they user is told that the feedback is anonymous and after they submit, the cannot edit their feedback, but they can provide additional feedback if they wish. They can choose to sign their name.
+
+Resource                     Payload                                                                           Response
+GET     /api/user/reviewees                                                                                    {"names": [$name_1, $name_2]} # this will populate with anyone on the same team and anyone who has requested a review from this user
+POST    /api/reviews         {"reviewee":$user, "strengths":[$strength], "growth_opportunity":[$opportunity]}  201
 
 they can also view users who have requested that the signed in user review them (good for cross team review)
 
+Request Review
+
+Page will have autocomplete of folks who have signed up. These requests are for those outside your team to give them visability to review you. Pending: notification of review request.
+
+Resource                 Payload          Response
+POST /api/user/reviewer  {"user": $user}  201
+
 view reviews page
 sorted by review cycle, the shows the reviews by strength or growth opportunity
+
+Resource Payload Response
+GET /api/reviews   {"reviews":[{"name":$cycle, "strengths":[$strength], "growth_opportunity":[$opportunity]}}
 
 for adding teams... show a list of teams. Have link, team not listed? add it! with form.
 
 Operability: set up db back ups. Capture error logs. v2: email error reports?
 
 whitelabel domains? domains -> teams?
-
-TODO: set up a schema version for compatibility checks when things get upgraded
 */
