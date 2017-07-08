@@ -3,11 +3,14 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
+
+	"net"
 
 	"github.com/facebookgo/flagenv"
 	"github.com/go-chi/chi"
@@ -39,12 +42,20 @@ func init() {
 	}()
 }
 
+type app struct {
+	db *sql.DB
+}
+
 func main() {
 	var dbfile string
+	var port int
 	flag.StringVar(&dbfile, "sqlite-path", "peerreview.db", "set the path to the sqlite3 db file")
+	// TODO: consider dynamic rewriting of html/js depending on port used
+	flag.IntVar(&port, "port", 3333, "set the port the server runs on. Note: the html/js needs to point to this same address. Best to leave it default.")
 	flagenv.Parse()
 	flag.Parse()
 
+	a := app{}
 	var err error
 
 	err = InitDB(dbfile)
@@ -52,21 +63,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	DB, err = sql.Open("sqlite3", dbfile)
+	a.db, err = sql.Open("sqlite3", dbfile)
 	if err != nil {
 		log.Fatalf("unable to open %s - %v", dbfile, err)
 	}
-	defer DB.Close()
+	defer a.db.Close()
 
-	if err := DB.Ping(); err != nil {
+	if err := a.db.Ping(); err != nil {
 		log.Fatal("unable to ping the db", err)
 	}
 
-	err = verifyDB(DB)
+	err = verifyDB(a.db)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatalf("unable to create listener - %v", err)
+	}
+	if err := Serve(a, l); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// Serve ...
+func Serve(a app, l net.Listener) error {
 	logger := logrus.New()
 	logger.Formatter = &logrus.TextFormatter{
 	// disable, as we set our own
@@ -85,16 +107,50 @@ func main() {
 		// TOOD, serve favicon
 	})
 
-	r.Get("/", rootHandler)
-	r.With(AuthMW).Get("/dash", dashHandler)
-	r.Post("/tokensignin", tokenHandler)
+	r.Get("/", a.rootHandler)
+	r.With(AuthMW).Get("/dash", a.dashHandler)
+	r.Post("/tokensignin", a.tokenHandler)
+
+	r.Mount("/api", apiRouter(a))
 
 	// if you update the port, you have to update the Google Sign In Client
 	// at https://console.developers.google.com/apis/credentials
-	log.Println("listening on :3333")
-	if err := http.ListenAndServe(":3333", r); err != nil {
-		log.Fatal(err)
+	log.Printf("listening on :%d", l.Addr().(*net.TCPAddr).Port)
+
+	if err := http.Serve(l, r); err != nil {
+		return nil
 	}
+	return nil
+}
+
+func apiRouter(a app) http.Handler {
+	r := chi.NewRouter()
+	r.Use(AuthMW)
+	r.Get("/user/team", a.apiUserTeam)
+	r.Post("/user/team", a.apiUserTeam)
+	r.Delete("/user/team", a.apiUserTeam)
+
+	r.Post("/user/goal", a.apiUserGoal)
+
+	r.Get("/user/reviewees", a.apiUserReviewees)
+
+	r.Get("/user/reviews", a.apiUserReviews)
+	r.Post("/user/reviews", a.apiUserReviews)
+
+	r.Post("/user/reviewer", a.apiUserReviewer)
+
+	r.Post("/user", a.apiUser)
+
+	r.Get("/admin/cycles", a.apiAdminCycles)
+	r.Post("/admin/cycles", a.apiAdminCycles)
+	r.Put("/admin/cycles", a.apiAdminCycles)
+	r.Delete("/admin/cycles", a.apiAdminCycles)
+
+	r.Get("/admin/teams", a.apiAdminTeams)
+	r.Post("/admin/teams", a.apiAdminTeams)
+	r.Delete("/admin/teams", a.apiAdminTeams)
+
+	return r
 }
 
 func RandStringRunes(n int) string {

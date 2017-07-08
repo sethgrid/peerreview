@@ -11,7 +11,7 @@ import (
 	"github.com/aymerick/raymond"
 )
 
-func rootHandler(w http.ResponseWriter, r *http.Request) {
+func (a app) rootHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("auth")
 	if err != nil {
 		log.Println("error reading auth cooking ", err)
@@ -31,7 +31,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
-func dashHandler(w http.ResponseWriter, r *http.Request) {
+func (a app) dashHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		log.Println("something went wrong")
@@ -49,7 +49,7 @@ func dashHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(result))
 }
 
-func tokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a app) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("idtoken")
 	resp, err := http.Get("https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=" + token)
 	if err != nil {
@@ -86,7 +86,7 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	key := RandStringRunes(keyLength)
 	SetAuth(key, info.Email, time.Now().Add(24*time.Hour))
-	err = CreateUser(DB, info.Name, info.Email)
+	err = CreateUser(a.db, info.Name, info.Email)
 	log.Println("called createUser")
 	if err != nil {
 		log.Println("error in createUser ", err) // TODO better err handling
@@ -96,13 +96,13 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(key))
 }
 
-func apiUser(w http.ResponseWriter, r *http.Request) {
+func (a app) apiUser(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
 		return
 	}
-	user, err := GetUser(DB, email)
+	user, err := GetUser(a.db, email)
 	if err != nil {
 		handleErr(w, r, err, "unable to get user's info", http.StatusBadRequest)
 		return
@@ -117,7 +117,7 @@ func apiUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiUserTeam(w http.ResponseWriter, r *http.Request) {
+func (a app) apiUserTeam(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
@@ -125,7 +125,7 @@ func apiUserTeam(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "GET" {
-		teams, err := GetUsersTeams(DB, email)
+		teams, err := GetUsersTeams(a.db, email)
 		if err != nil {
 			handleErr(w, r, err, "unable to get user's teams", http.StatusInternalServerError)
 			return
@@ -158,7 +158,7 @@ func apiUserTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		err = AssignTeamToUser(DB, email, payload.Team)
+		err = AssignTeamToUser(a.db, email, payload.Team)
 		if err != nil {
 			handleErr(w, r, err, "unable to assign team to user", http.StatusInternalServerError)
 			return
@@ -166,7 +166,7 @@ func apiUserTeam(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		return
 	} else if r.Method == "DELETE" {
-		err = RemoveTeamFromUser(DB, email, payload.Team)
+		err = RemoveTeamFromUser(a.db, email, payload.Team)
 		if err != nil {
 			handleErr(w, r, err, "unable to remove team from user", http.StatusInternalServerError)
 			return
@@ -178,7 +178,7 @@ func apiUserTeam(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiUserGoal(w http.ResponseWriter, r *http.Request) {
+func (a app) apiUserGoal(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
@@ -203,7 +203,7 @@ func apiUserGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = AssignGoalToUser(DB, email, payload.Goal)
+	err = AssignGoalToUser(a.db, email, payload.Goal)
 	if err != nil {
 		handleErr(w, r, err, "unable to assign goal to user", http.StatusInternalServerError)
 		return
@@ -211,7 +211,7 @@ func apiUserGoal(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func apiUserReviewees(w http.ResponseWriter, r *http.Request) {
+func (a app) apiUserReviewees(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
@@ -240,7 +240,7 @@ func apiUserReviewees(w http.ResponseWriter, r *http.Request) {
 		Reviewees []UserInfoLite `json:"reviewees"`
 	}
 
-	data.Reviewees, err = GetReviewees(DB, email, payload.Cycle)
+	data.Reviewees, err = GetReviewees(a.db, email, payload.Cycle)
 	if err != nil {
 		handleErr(w, r, err, "unable to get reviewees", http.StatusInternalServerError)
 		return
@@ -252,7 +252,7 @@ func apiUserReviewees(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiUserReviews(w http.ResponseWriter, r *http.Request) {
+func (a app) apiUserReviews(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
@@ -264,7 +264,7 @@ func apiUserReviews(w http.ResponseWriter, r *http.Request) {
 			Reviews []Review `json:"reviews"`
 		}
 		var err error
-		data.Reviews, err = GetUserReviews(DB, email)
+		data.Reviews, err = GetUserReviews(a.db, email)
 		if err != nil {
 			handleErr(w, r, err, "unable to get reviews", http.StatusInternalServerError)
 			return
@@ -297,7 +297,7 @@ func apiUserReviews(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = AddUserReview(DB, payload.RevieweeEmail, payload.Strengths, payload.Opportunities, payload.Cycle)
+		err = AddUserReview(a.db, payload.RevieweeEmail, payload.Strengths, payload.Opportunities, payload.Cycle)
 		if err != nil {
 			handleErr(w, r, err, "unable to add review", http.StatusInternalServerError)
 			return
@@ -309,7 +309,7 @@ func apiUserReviews(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
+func (a app) apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
@@ -345,7 +345,7 @@ func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = SetUserReviewer(DB, email, payload.UserEmail, payload.Cycle)
+	err = SetUserReviewer(a.db, email, payload.UserEmail, payload.Cycle)
 	if err != nil {
 		handleErr(w, r, err, "unable to set reviewer", http.StatusInternalServerError)
 		return
@@ -353,13 +353,13 @@ func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
+func (a app) apiAdminCycles(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		var data struct {
 			Cycles []Cycle `json:"cycles"`
 		}
 		var err error
-		data.Cycles, err = GetCycles(DB)
+		data.Cycles, err = GetCycles(a.db)
 		if err != nil {
 			handleErr(w, r, err, "unable to get cycles", http.StatusInternalServerError)
 			return
@@ -394,7 +394,7 @@ func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
-		err = AddCycle(DB, payload.Cycle)
+		err = AddCycle(a.db, payload.Cycle)
 		if err != nil {
 			handleErr(w, r, err, "unable to add cycle", http.StatusInternalServerError)
 			return
@@ -402,14 +402,14 @@ func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		return
 	} else if r.Method == "PUT" {
-		err = UpdateCycle(DB, payload.Cycle, payload.IsOpen)
+		err = UpdateCycle(a.db, payload.Cycle, payload.IsOpen)
 		if err != nil {
 			handleErr(w, r, err, "unable to update cycle", http.StatusInternalServerError)
 			return
 		}
 		return
 	} else if r.Method == "DELETE" {
-		err = DeleteCycle(DB, payload.Cycle)
+		err = DeleteCycle(a.db, payload.Cycle)
 		if err != nil {
 			handleErr(w, r, err, "unable to delete cycle", http.StatusInternalServerError)
 			return
@@ -421,13 +421,13 @@ func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
+func (a app) apiAdminTeams(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		var data struct {
 			Teams []string `json:"teams"`
 		}
 		var err error
-		data.Teams, err = GetTeams(DB)
+		data.Teams, err = GetTeams(a.db)
 		if err != nil {
 			handleErr(w, r, err, "unable to get teams", http.StatusInternalServerError)
 			return
@@ -461,7 +461,7 @@ func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
-		err = AddTeam(DB, payload.Team)
+		err = AddTeam(a.db, payload.Team)
 		if err != nil {
 			handleErr(w, r, err, "unable to add team", http.StatusInternalServerError)
 			return
@@ -469,7 +469,7 @@ func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		return
 	} else if r.Method == "DELETE" {
-		err = DeleteTeam(DB, payload.Team)
+		err = DeleteTeam(a.db, payload.Team)
 		if err != nil {
 			handleErr(w, r, err, "unable to delete team", http.StatusInternalServerError)
 			return
