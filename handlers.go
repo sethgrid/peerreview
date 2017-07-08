@@ -96,6 +96,321 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(key))
 }
 
+func apiUser(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(ctxEmail).(string)
+	if email == "" {
+		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
+		return
+	}
+	user, err := GetUser(DB, email)
+	if err != nil {
+		handleErr(w, r, err, "unable to get user's info", http.StatusBadRequest)
+		return
+	}
+	m := map[string]interface{}{
+		"user": user,
+	}
+	err = json.NewEncoder(w).Encode(m)
+	if err != nil {
+		handleErr(w, r, err, "unable to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func apiUserTeam(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(ctxEmail).(string)
+	if email == "" {
+		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Method == "GET" {
+		teams, err := GetUsersTeams(DB, email)
+		if err != nil {
+			handleErr(w, r, err, "unable to get user's teams", http.StatusInternalServerError)
+			return
+		}
+		m := map[string]interface{}{
+			"teams": teams,
+		}
+		err = json.NewEncoder(w).Encode(m)
+		if err != nil {
+			handleErr(w, r, err, "unable to encode response", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	var payload struct {
+		Team string `json:"team"`
+	}
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+		return
+	}
+	err = json.Unmarshal(b, &payload)
+	if err != nil {
+		handleErr(w, r, err, `unable to marshal body. Should be {"team":"team_name"}`, http.StatusBadRequest)
+		return
+	}
+	if payload.Team == "" {
+		handleErr(w, r, nil, "team name cannot be empty", http.StatusBadRequest)
+		return
+	}
+	if r.Method == "POST" {
+		err = AssignTeamToUser(DB, email, payload.Team)
+		if err != nil {
+			handleErr(w, r, err, "unable to assign team to user", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		return
+	} else if r.Method == "DELETE" {
+		err = RemoveTeamFromUser(DB, email, payload.Team)
+		if err != nil {
+			handleErr(w, r, err, "unable to remove team from user", http.StatusInternalServerError)
+			return
+		}
+		return
+	} else {
+		handleErr(w, r, nil, "unexpected method: "+r.Method, http.StatusBadRequest)
+		return
+	}
+}
+
+func apiUserGoal(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(ctxEmail).(string)
+	if email == "" {
+		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
+		return
+	}
+
+	var payload struct {
+		Goal string `json:"goal"`
+	}
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+		return
+	}
+	err = json.Unmarshal(b, &payload)
+	if err != nil {
+		handleErr(w, r, err, `unable to marshal body. Should be {"goal":"description"}`, http.StatusBadRequest)
+		return
+	}
+	if payload.Goal == "" {
+		handleErr(w, r, nil, "goal cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	err = AssignGoalToUser(DB, email, payload.Goal)
+	if err != nil {
+		handleErr(w, r, err, "unable to assign goal to user", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func apiUserReviewees(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(ctxEmail).(string)
+	if email == "" {
+		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
+		return
+	}
+
+	var data struct {
+		Reviewees []userInfoLite `json:"reviewees"`
+	}
+	var err error
+	data.Reviewees, err = GetReviewees(DB, email)
+	if err != nil {
+		handleErr(w, r, err, "unable to get reviewees", http.StatusInternalServerError)
+		return
+	}
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
+		handleErr(w, r, err, "unable to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func apiUserReviews(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(ctxEmail).(string)
+	if email == "" {
+		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Method == "GET" {
+		var data struct {
+			Reviews []review `json:"reviews"`
+		}
+		var err error
+		data.Reviews, err = GetUserReviews(DB, email)
+		if err != nil {
+			handleErr(w, r, err, "unable to get reviews", http.StatusInternalServerError)
+			return
+		}
+		err = json.NewEncoder(w).Encode(data)
+		if err != nil {
+			handleErr(w, r, err, "unable to encode response", http.StatusInternalServerError)
+			return
+		}
+		return
+	} else if r.Method == "POST" {
+		var payload struct {
+			RevieweeEmail string   `json:"reviewee_email"`
+			Strengths     []string `json:"strengths"`
+			Opportunities []string `json:"growth_opportunities"`
+		}
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+			return
+		}
+		err = json.Unmarshal(b, &payload)
+		if err != nil {
+			handleErr(w, r, err, `unable to marshal body. Should be {"goal":"description"}`, http.StatusBadRequest)
+			return
+		}
+		if payload.RevieweeEmail == "" || len(payload.Strengths) == 0 || len(payload.Opportunities) == 0 {
+			handleErr(w, r, nil, "reviewee_email, strengths, or growth_opportunies cannot be empty", http.StatusBadRequest)
+			return
+		}
+
+		err = AddUserReview(DB, payload.RevieweeEmail, payload.Strengths, payload.Opportunities)
+		if err != nil {
+			handleErr(w, r, err, "unable to add review", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	} else {
+		handleErr(w, r, nil, "unexpected method "+r.Method, http.StatusBadRequest)
+		return
+	}
+}
+
+func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value(ctxEmail).(string)
+	if email == "" {
+		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
+		return
+	}
+
+	var payload struct {
+		UserEmail string `json:"user_email"`
+	}
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+		return
+	}
+	err = json.Unmarshal(b, &payload)
+	if err != nil {
+		handleErr(w, r, err, `unable to marshal body. Should be {"user_email":"email"}`, http.StatusBadRequest)
+		return
+	}
+	if payload.UserEmail == "" {
+		handleErr(w, r, nil, "user_email cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if r.Method != "POST" {
+		handleErr(w, r, nil, "unexpected method "+r.Method, http.StatusBadRequest)
+		return
+	}
+
+	err = SetUserReviewer(DB, email, payload.UserEmail)
+	if err != nil {
+		handleErr(w, r, err, "unable to set reviewer", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		var data struct {
+			Cycles []cycle `json:"cycles"`
+		}
+		var err error
+		data.Cycles, err = GetCycles(DB)
+		if err != nil {
+			handleErr(w, r, err, "unable to get cycles", http.StatusInternalServerError)
+			return
+		}
+		err = json.NewEncoder(w).Encode(data)
+		if err != nil {
+			// note, this will give an error of status code already written.
+			// TODO: have a new handler that does nto set status code?
+			handleErr(w, r, err, "unable to marshal payload", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	var payload struct {
+		Cycle  string `json:"cycle"`
+		IsOpen bool   `json:"is_open"`
+	}
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+		return
+	}
+	err = json.Unmarshal(b, &payload)
+	if err != nil {
+		handleErr(w, r, err, `unable to marshal body. Should be {"cycle":"cycle name", "is_open":bool} (note, is_open is for PUT calls only)`, http.StatusBadRequest)
+		return
+	}
+	if payload.Cycle == "" {
+		handleErr(w, r, nil, "cycle cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if r.Method == "POST" {
+		err = AddCycle(DB, payload.Cycle)
+		if err != nil {
+			handleErr(w, r, err, "unable to add cycle", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		return
+	} else if r.Method == "PUT" {
+		err = UpdateCycle(DB, payload.Cycle, payload.IsOpen)
+		if err != nil {
+			handleErr(w, r, err, "unable to update cycle", http.StatusInternalServerError)
+			return
+		}
+		return
+	} else if r.Method == "DELETE" {
+		err = DeleteCycle(DB, payload.Cycle)
+		if err != nil {
+			handleErr(w, r, err, "unable to delete cycle", http.StatusInternalServerError)
+			return
+		}
+		return
+	} else {
+		handleErr(w, r, nil, "unexpected method "+r.Method, http.StatusBadRequest)
+		return
+	}
+}
+
+func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func handleErr(w http.ResponseWriter, r *http.Request, err error, msg string, code int) {
+	// TODO get access to app's logger to get req id, path, etc for free
+	if err == nil {
+		log.Printf("error: %s", msg)
+	} else {
+		log.Printf("error: %s - %v", msg, err)
+	}
+	w.WriteHeader(code)
+	w.Write([]byte(msg))
+}
+
 func AuthMW(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		var isAuthorized bool

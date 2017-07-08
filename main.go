@@ -137,8 +137,8 @@ they can adjust what team(s) they are on. Some managers have multiple teams, qa 
 can set a goal description
 
 Resource                 Payload            Response
-GET     /api/teams                          {"teams":[$team_a, $team_b, $team_c]}
 GET     /api/user                           {"user":{"name": $name, "email", $email, "goal":$goal, "teams":[$team_a]}}
+GET     /api/user/team                      {"teams":[$team_a, $team_b, $team_c]}
 POST    /api/user/team   {"team": $team}    201
 DELETE  /api/user/team   {"team": $team}    200
 POST    /api/user/goal   {"goal": $goal}    201
@@ -148,8 +148,8 @@ user can see other team members (name). When they click on a team member, they c
 they user is told that the feedback is anonymous and after they submit, the cannot edit their feedback, but they can provide additional feedback if they wish. They can choose to sign their name.
 
 Resource                     Payload                                                                           Response
-GET     /api/user/reviewees                                                                                    {"names": [$name_1, $name_2]} # this will populate with anyone on the same team and anyone who has requested a review from this user
-POST    /api/reviews         {"reviewee":$user, "strengths":[$strength], "growth_opportunity":[$opportunity]}  201
+GET     /api/user/reviewees                                                                                    {"reviewees": [{"name": $name, "email": $email}]} # this will populate with anyone on the same team and anyone who has requested a review from this user
+POST    /api/user/reviews         {"reviewee_email":$email, "strengths":[$strength], "growth_opportunity":[$opportunity]}  201
 
 they can also view users who have requested that the signed in user review them (good for cross team review)
 
@@ -158,13 +158,23 @@ Request Review
 Page will have autocomplete of folks who have signed up. These requests are for those outside your team to give them visability to review you. Pending: notification of review request.
 
 Resource                 Payload          Response
-POST /api/user/reviewer  {"user": $user}  201
+POST /api/user/reviewer  {"user_email": $user}  201
 
 view reviews page
 sorted by review cycle, the shows the reviews by strength or growth opportunity
 
 Resource Payload Response
-GET /api/reviews   {"reviews":[{"name":$cycle, "strengths":[$strength], "growth_opportunity":[$opportunity]}}
+GET /api/user/reviews   {"reviews":[{"cycle":$cycle, "strengths":[$strength], "growth_opportunities":[$opportunity]}}
+
+Admin stuffs
+GET    /api/admin/cycles                                  {"cycles":[$cycle_name]}
+POST   /api/admin/cycles {"cycle":$name}                  201
+PUT    /api/admin/cycles {"cycle":$name, "is_open":bool}  200
+DELETE /api/admin/cycles {"cycle":$name}                  200
+
+GET    /api/admin/teams                                   {"teams":[$team_name]}
+POST   /api/admin/teams  {"team":$team_name}              201
+DELETE /api/admin/teams  {"team":$team_name}              200
 
 for adding teams... show a list of teams. Have link, team not listed? add it! with form.
 

@@ -59,6 +59,82 @@ func createUser(db *sql.DB, name, email string) (err error) {
 	return nil
 }
 
+func GetUsersTeams(db *sql.DB, email string) ([]string, error) {
+	return nil, nil
+}
+
+type userInfo struct {
+	Name  string   `json:"name"`
+	Email string   `json:"email"`
+	Goal  string   `json:"goal"`
+	Teams []string `json:"teams"`
+}
+
+type userInfoLite struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+func GetUser(db *sql.DB, email string) (userInfo, error) {
+	return userInfo{}, nil
+}
+
+func AssignTeamToUser(db *sql.DB, email string, team string) error {
+	return nil
+}
+
+func RemoveTeamFromUser(db *sql.DB, email string, team string) error {
+	// if the user does not have that team already that is fine, return nil
+	return nil
+}
+
+func AssignGoalToUser(db *sql.DB, email string, goal string) error {
+	return nil
+}
+
+func SetUserReviewer(db *sql.DB, userEmail string, eligibleReviewer string) error {
+	return nil
+}
+
+func GetReviewees(db *sql.DB, email string) ([]userInfoLite, error) {
+	return nil, nil
+}
+
+type review struct {
+	Cycle         string   `json:"cycle"`
+	Strengths     []string `json:"strengths"`
+	Opportunities []string `json:"growth_opportunities"`
+}
+
+func GetUserReviews(db *sql.DB, email string) ([]review, error) {
+	return nil, nil
+}
+
+func AddUserReview(db *sql.DB, revieweeEmail string, strengths []string, opportunities []string) error {
+	return nil
+}
+
+type cycle struct {
+	Name   string `json:"name"`
+	IsOpen bool   `json:"is_open"`
+}
+
+func GetCycles(db *sql.DB) ([]cycle, error) {
+	return nil, nil
+}
+
+func AddCycle(db *sql.DB, cycleName string) error {
+	return nil
+}
+
+func UpdateCycle(db *sql.DB, cycleName string, isOpen bool) error {
+	return nil
+}
+
+func DeleteCycle(db *sql.DB, cycleName string) error {
+	return nil
+}
+
 func verifyDB(db *sql.DB) error {
 	row := db.QueryRow("select version from schema_version")
 	var detectedSchemaVersion string
