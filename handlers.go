@@ -86,7 +86,7 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	key := RandStringRunes(keyLength)
 	SetAuth(key, info.Email, time.Now().Add(24*time.Hour))
-	err = createUser(DB, info.Name, info.Email)
+	err = CreateUser(DB, info.Name, info.Email)
 	log.Println("called createUser")
 	if err != nil {
 		log.Println("error in createUser ", err) // TODO better err handling
@@ -218,11 +218,29 @@ func apiUserReviewees(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data struct {
-		Reviewees []userInfoLite `json:"reviewees"`
+	var payload struct {
+		Cycle string `json:"cycle"`
 	}
-	var err error
-	data.Reviewees, err = GetReviewees(DB, email)
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+		return
+	}
+	err = json.Unmarshal(b, &payload)
+	if err != nil {
+		handleErr(w, r, err, `unable to marshal body. Should be {"cycle":"cycle name"}`, http.StatusBadRequest)
+		return
+	}
+	if payload.Cycle == "" {
+		handleErr(w, r, nil, "cycle cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		Reviewees []UserInfoLite `json:"reviewees"`
+	}
+
+	data.Reviewees, err = GetReviewees(DB, email, payload.Cycle)
 	if err != nil {
 		handleErr(w, r, err, "unable to get reviewees", http.StatusInternalServerError)
 		return
@@ -243,7 +261,7 @@ func apiUserReviews(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		var data struct {
-			Reviews []review `json:"reviews"`
+			Reviews []Review `json:"reviews"`
 		}
 		var err error
 		data.Reviews, err = GetUserReviews(DB, email)
@@ -262,6 +280,7 @@ func apiUserReviews(w http.ResponseWriter, r *http.Request) {
 			RevieweeEmail string   `json:"reviewee_email"`
 			Strengths     []string `json:"strengths"`
 			Opportunities []string `json:"growth_opportunities"`
+			Cycle         string   `json:"cycle"`
 		}
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -273,12 +292,12 @@ func apiUserReviews(w http.ResponseWriter, r *http.Request) {
 			handleErr(w, r, err, `unable to marshal body. Should be {"goal":"description"}`, http.StatusBadRequest)
 			return
 		}
-		if payload.RevieweeEmail == "" || len(payload.Strengths) == 0 || len(payload.Opportunities) == 0 {
-			handleErr(w, r, nil, "reviewee_email, strengths, or growth_opportunies cannot be empty", http.StatusBadRequest)
+		if payload.RevieweeEmail == "" || len(payload.Strengths) == 0 || len(payload.Opportunities) == 0 || payload.Cycle == "" {
+			handleErr(w, r, nil, "reviewee_email, strengths, growth_opportunies, and/or cycle cannot be empty", http.StatusBadRequest)
 			return
 		}
 
-		err = AddUserReview(DB, payload.RevieweeEmail, payload.Strengths, payload.Opportunities)
+		err = AddUserReview(DB, payload.RevieweeEmail, payload.Strengths, payload.Opportunities, payload.Cycle)
 		if err != nil {
 			handleErr(w, r, err, "unable to add review", http.StatusInternalServerError)
 			return
@@ -299,6 +318,7 @@ func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 
 	var payload struct {
 		UserEmail string `json:"user_email"`
+		Cycle     string `json:"cycle"`
 	}
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -307,11 +327,16 @@ func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 	}
 	err = json.Unmarshal(b, &payload)
 	if err != nil {
-		handleErr(w, r, err, `unable to marshal body. Should be {"user_email":"email"}`, http.StatusBadRequest)
+		handleErr(w, r, err, `unable to marshal body. Should be {"user_email":"email", "cycle":"cycle name"}`, http.StatusBadRequest)
 		return
 	}
 	if payload.UserEmail == "" {
 		handleErr(w, r, nil, "user_email cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if payload.Cycle == "" {
+		handleErr(w, r, nil, "cycle cannot be empty", http.StatusBadRequest)
 		return
 	}
 
@@ -320,7 +345,7 @@ func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = SetUserReviewer(DB, email, payload.UserEmail)
+	err = SetUserReviewer(DB, email, payload.UserEmail, payload.Cycle)
 	if err != nil {
 		handleErr(w, r, err, "unable to set reviewer", http.StatusInternalServerError)
 		return
@@ -328,10 +353,10 @@ func apiUserReviewer(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
+func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		var data struct {
-			Cycles []cycle `json:"cycles"`
+			Cycles []Cycle `json:"cycles"`
 		}
 		var err error
 		data.Cycles, err = GetCycles(DB)
@@ -396,8 +421,64 @@ func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiAdminCycles(w http.ResponseWriter, r *http.Request) {
+func apiAdminTeams(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		var data struct {
+			Teams []string `json:"teams"`
+		}
+		var err error
+		data.Teams, err = GetTeams(DB)
+		if err != nil {
+			handleErr(w, r, err, "unable to get teams", http.StatusInternalServerError)
+			return
+		}
+		err = json.NewEncoder(w).Encode(data)
+		if err != nil {
+			// note, this will give an error of status code already written.
+			// TODO: have a new handler that does nto set status code?
+			handleErr(w, r, err, "unable to marshal payload", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
 
+	var payload struct {
+		Team string `json:"team"`
+	}
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
+		return
+	}
+	err = json.Unmarshal(b, &payload)
+	if err != nil {
+		handleErr(w, r, err, `unable to marshal body. Should be {"team":"team name"}`, http.StatusBadRequest)
+		return
+	}
+	if payload.Team == "" {
+		handleErr(w, r, nil, "team cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if r.Method == "POST" {
+		err = AddTeam(DB, payload.Team)
+		if err != nil {
+			handleErr(w, r, err, "unable to add team", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		return
+	} else if r.Method == "DELETE" {
+		err = DeleteTeam(DB, payload.Team)
+		if err != nil {
+			handleErr(w, r, err, "unable to delete team", http.StatusInternalServerError)
+			return
+		}
+		return
+	} else {
+		handleErr(w, r, nil, "unexpected method "+r.Method, http.StatusBadRequest)
+		return
+	}
 }
 
 func handleErr(w http.ResponseWriter, r *http.Request, err error, msg string, code int) {

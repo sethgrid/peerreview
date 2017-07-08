@@ -47,7 +47,7 @@ func main() {
 
 	var err error
 
-	err = initDB(dbfile)
+	err = InitDB(dbfile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -147,9 +147,9 @@ submit review page
 user can see other team members (name). When they click on a team member, they can enter multiple feedbacks under strength or growth is_growth_opportunity
 they user is told that the feedback is anonymous and after they submit, the cannot edit their feedback, but they can provide additional feedback if they wish. They can choose to sign their name.
 
-Resource                     Payload                                                                           Response
-GET     /api/user/reviewees                                                                                    {"reviewees": [{"name": $name, "email": $email}]} # this will populate with anyone on the same team and anyone who has requested a review from this user
-POST    /api/user/reviews         {"reviewee_email":$email, "strengths":[$strength], "growth_opportunity":[$opportunity]}  201
+Resource                     Payload                                                                                                        Response
+GET     /api/user/reviewees  {"cycle": $cycle_name}                                                                                         {"reviewees": [{"name": $name, "email": $email}]} # this will populate with anyone on the same team and anyone who has requested a review from this user during this cycle
+POST    /api/user/reviews    {"reviewee_email":$email, "strengths":[$strength], "growth_opportunity":[$opportunity], "cycle": $cycle_name}  201
 
 they can also view users who have requested that the signed in user review them (good for cross team review)
 
@@ -157,8 +157,8 @@ Request Review
 
 Page will have autocomplete of folks who have signed up. These requests are for those outside your team to give them visability to review you. Pending: notification of review request.
 
-Resource                 Payload          Response
-POST /api/user/reviewer  {"user_email": $user}  201
+Resource                 Payload                                 Response
+POST /api/user/reviewer  {"user_email": $user, "cycle": $cycle}  201
 
 view reviews page
 sorted by review cycle, the shows the reviews by strength or growth opportunity
@@ -167,7 +167,7 @@ Resource Payload Response
 GET /api/user/reviews   {"reviews":[{"cycle":$cycle, "strengths":[$strength], "growth_opportunities":[$opportunity]}}
 
 Admin stuffs
-GET    /api/admin/cycles                                  {"cycles":[$cycle_name]}
+GET    /api/admin/cycles                                  {"cycles":[{"name":$cycle_name, "is_open":bool}]}
 POST   /api/admin/cycles {"cycle":$name}                  201
 PUT    /api/admin/cycles {"cycle":$name, "is_open":bool}  200
 DELETE /api/admin/cycles {"cycle":$name}                  200
