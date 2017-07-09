@@ -193,6 +193,7 @@ func RemoveTeamFromUser(db *sql.DB, email string, team string) error {
 		return nil
 	}
 
+	// TODO - look into recompiling sqlite3
 	q := `
     DELETE FROM user_teams
     WHERE  user_id = (SELECT id

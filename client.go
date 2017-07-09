@@ -41,6 +41,22 @@ func (c *Client) DeleteTeam(team string) error {
 	return err
 }
 
+func (c *Client) GetTeams() ([]string, error) {
+	expectedCode := http.StatusOK
+	verb := "GET"
+	uri := "/api/admin/teams"
+	b, err := c.clientDo(verb, uri, expectedCode, "")
+	if err != nil {
+		return nil, err
+	}
+	var data teamPayload
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return nil, err
+	}
+	return data.Teams, nil
+}
+
 func (c *Client) GetUsersTeams() ([]string, error) {
 	expectedCode := http.StatusOK
 	verb := "GET"

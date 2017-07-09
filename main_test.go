@@ -26,13 +26,39 @@ func init() {
 	fmt.Println("Optional test flags: -randseed :int -save-db :bool -show-logs :bool")
 }
 
-func TestAPITeam(t *testing.T) {
+func TestAPIAdminTeam(t *testing.T) {
+	/*
+		Verify we can insert teams into the system
+		Verify we can get teams inserted into the system
+		Verify we can delete teams from the system
+	*/
+	cli, teardown := setupInstance()
+	defer teardown()
+
+	NoErr(t, cli.InsertTeam("team_a"), "Insert team a")
+	NoErr(t, cli.InsertTeam("team_b"), "Insert team b")
+
+	teams, err := cli.GetTeams()
+	NoErr(t, err, "Get teams after insert")
+
+	if got, want := len(teams), 2; got != want {
+		t.Errorf("got %d teams, want %d", got, want)
+	}
+
+	NoErr(t, cli.DeleteTeam("team_b"), "delete team b")
+
+	teams, err = cli.GetTeams()
+	NoErr(t, err, "Get teams after insert")
+
+	if got, want := len(teams), 1; got != want {
+		t.Errorf("got %d teams, want %d", got, want)
+	}
+}
+func TestAPIUserTeam(t *testing.T) {
 	/*
 		Verify no teams are assigned by default
-		Verify we can insert teams into the system
 		Verify we can assign teams to a user
 		Verify we can remove a user from a team
-		Verify we can remove a team from the system
 	*/
 	cli, teardown := setupInstance()
 	defer teardown()
@@ -44,6 +70,7 @@ func TestAPITeam(t *testing.T) {
 		t.Errorf("got %d teams, want %d", got, want)
 	}
 
+	// teams must be inserted to be able to be assigned to a user
 	NoErr(t, cli.InsertTeam("team_a"), "Insert team a")
 	NoErr(t, cli.InsertTeam("team_b"), "Insert team b")
 
@@ -58,7 +85,6 @@ func TestAPITeam(t *testing.T) {
 	}
 
 	NoErr(t, cli.RemoveTeamFromUser("team_b"), "remove team b from user")
-	NoErr(t, cli.DeleteTeam("team_b"), "delete team b")
 
 	teams, err = cli.GetUsersTeams()
 	NoErr(t, err, "Get users after insert")
