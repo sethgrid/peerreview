@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/aymerick/raymond"
@@ -138,6 +140,7 @@ func (a app) apiUserTeam(w http.ResponseWriter, r *http.Request) {
 			handleErr(w, r, err, "unable to encode response", http.StatusInternalServerError)
 			return
 		}
+		return
 	}
 
 	var payload struct {
@@ -150,7 +153,7 @@ func (a app) apiUserTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	err = json.Unmarshal(b, &payload)
 	if err != nil {
-		handleErr(w, r, err, `unable to marshal body. Should be {"team":"team_name"}`, http.StatusBadRequest)
+		handleErr(w, r, err, fmt.Sprintf(`unable to marshal body. Should be {"team":"team_name"}. Got %s`, string(b)), http.StatusBadRequest)
 		return
 	}
 	if payload.Team == "" {
@@ -483,6 +486,8 @@ func (a app) apiAdminTeams(w http.ResponseWriter, r *http.Request) {
 
 func handleErr(w http.ResponseWriter, r *http.Request, err error, msg string, code int) {
 	// TODO get access to app's logger to get req id, path, etc for free
+	_, fn, line, _ := runtime.Caller(1)
+	msg = fmt.Sprintf("[ %s:%d ] %s", fn, line, msg)
 	if err == nil {
 		log.Printf("error: %s", msg)
 	} else {

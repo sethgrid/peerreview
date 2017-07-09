@@ -21,7 +21,6 @@ import (
 // InitDB creates the db if needed
 func InitDB(dbfile string) error {
 	if _, err := os.Stat(dbfile); os.IsNotExist(err) {
-		log.Printf("creating %s", dbfile)
 		err := createDB(dbfile)
 		if err != nil {
 			return errors.Wrap(err, "unable to create db")
@@ -73,8 +72,7 @@ func GetUsersTeams(db *sql.DB, email string) ([]string, error) {
 	q := `
         SELECT t.NAME
         FROM   teams t
-        JOIN
-        on     user_teams ut
+        JOIN   user_teams ut
         ON     ut.team_id=t.id
         JOIN   users u
         ON     ut.user_id=u.id
@@ -170,11 +168,11 @@ func AssignTeamToUser(db *sql.DB, email string, team string) error {
                     (user_id,
                     team_id)
         VALUES      ((SELECT id
-                    FROM     user
+                    FROM     users
                     WHERE    email =?
                     LIMIT  1),
                     (SELECT id
-                    FROM     team
+                    FROM     teams
                     WHERE    name =?
                     LIMIT  1))
     `
@@ -198,11 +196,11 @@ func RemoveTeamFromUser(db *sql.DB, email string, team string) error {
 	q := `
     DELETE FROM user_teams
     WHERE  user_id = (SELECT id
-                    FROM   user
+                    FROM   users
                     WHERE  email =?
                     LIMIT  1)
         AND team_id = (SELECT id
-                        FROM   team
+                        FROM   teams
                         WHERE  name =?
                         LIMIT  1)
     LIMIT 1
@@ -232,11 +230,11 @@ func SetUserReviewer(db *sql.DB, userEmail string, eligibleReviewer string, cycl
                 reviewer_id,
                 cycle_id)
     VALUES      ((SELECT id
-                FROM   user
+                FROM   users
                 WHERE  email =?
                 LIMIT  1),
                 (SELECT id
-                FROM   user
+                FROM   users
                 WHERE  email =?
                 LIMIT  1),
                 (SELECT id
@@ -568,32 +566,45 @@ func createDB(path string) error {
 
 	q := `
     create table schema_version (version text not null primary key);
-    create table users (id integer not null primary key, name text, email text, goals text);
-    create table teams (id integer not null primary key, name text);
+    create table users (
+		id integer not null primary key,
+		name text,
+		email text not null,
+		goals text
+	);
+    create table teams (
+		id integer not null primary key,
+		name text not null
+	);
     create table user_teams (
         id integer not null primary key,
-        user_id integer, team_id integer,
+        user_id integer not null,
+		team_id integer not null,
         FOREIGN KEY(user_id) REFERENCES users(id),
         FOREIGN KEY(team_id) REFERENCES teams(id)
     );
-    create table review_cycles (id integer not null primary key, name text, is_open boolean);
+    create table review_cycles (
+		id integer not null primary key,
+		name text not null,
+		is_open boolean not null
+	);
     create table reviews (
         id integer not null primary key,
-        recipient_id integer,
-        review_cycle_id integer,
-        feedback text,
-        is_strength boolean,
-        is_growth_opportunity boolean,
+        recipient_id integer not null,
+        review_cycle_id integer not null,
+        feedback text not null,
+        is_strength boolean not null,
+        is_growth_opportunity boolean not null,
         FOREIGN KEY(recipient_id) REFERENCES users(id),
         FOREIGN KEY(review_cycle_id) REFERENCES review_cycles(id)
     );
     create table review_requests (
         id integer not null primary key,
-        recipient_id integer,
-        reviewer_id integer,
-        cycle_id integer,
-        FOREIGN KEY (recipient_id) REFERENCES user(id),
-        FOREIGN KEY (reviewer_id) REFERENCES user(id),
+        recipient_id integer not null,
+        reviewer_id integer not null,
+        cycle_id integer not null,
+        FOREIGN KEY (recipient_id) REFERENCES users(id),
+        FOREIGN KEY (reviewer_id) REFERENCES users(id),
         FOREIGN KEY (cycle_id) REFERENCES review_cycles(id)
     );
     `

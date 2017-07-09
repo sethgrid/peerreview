@@ -27,9 +27,6 @@ type ctxType string
 
 var ctxEmail ctxType = "email"
 
-// DB is globally available
-var DB *sql.DB
-
 func init() {
 	if _, err := os.Stat("oauth_config.json"); err != nil {
 		log.Fatal("oauth_config.json not found. Download the file contents from https://console.developers.google.com/apis/credentials. See README.md for more details.")
@@ -82,13 +79,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to create listener - %v", err)
 	}
-	if err := Serve(a, l); err != nil {
+	if err := Serve(a, l, true); err != nil {
 		log.Fatal(err)
 	}
 }
 
 // Serve ...
-func Serve(a app, l net.Listener) error {
+func Serve(a app, l net.Listener, showLogs bool) error {
 	logger := logrus.New()
 	logger.Formatter = &logrus.TextFormatter{
 	// disable, as we set our own
@@ -99,7 +96,9 @@ func Serve(a app, l net.Listener) error {
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(NewStructuredLogger(logger))
+	if showLogs {
+		r.Use(NewStructuredLogger(logger))
+	}
 	r.Use(middleware.Recoverer)
 
 	// separate route created for this, intended to prevent logging of its request
@@ -115,7 +114,7 @@ func Serve(a app, l net.Listener) error {
 
 	// if you update the port, you have to update the Google Sign In Client
 	// at https://console.developers.google.com/apis/credentials
-	log.Printf("listening on :%d", l.Addr().(*net.TCPAddr).Port)
+	//log.Printf("listening on :%d", l.Addr().(*net.TCPAddr).Port)
 
 	if err := http.Serve(l, r); err != nil {
 		return nil
