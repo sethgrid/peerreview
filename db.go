@@ -452,8 +452,8 @@ func AddCycle(db *sql.DB, cycleName string) error {
 
 // UpdateCycle sets if the cycle is open or not
 func UpdateCycle(db *sql.DB, cycleName string, isOpen bool) error {
-	q := "update review_cycles set is_open=? where name=? limit 1"
-	if _, err := db.Exec(q, isOpen, cycleName); err != nil {
+	q := "update review_cycles set is_open=? where name=?"
+	if _, err := db.Exec(q, bool2int(isOpen), cycleName); err != nil {
 		return errors.Wrap(err, "unable to update cycle")
 	}
 	return nil
@@ -466,10 +466,15 @@ func DeleteCycle(db *sql.DB, cycleName string) error {
 		return errors.Wrap(err, "unable to get cycles for comparison when deleting")
 	}
 	// if it is not there, don't need to delete it
+	var found bool
 	for _, cycle := range cycles {
 		if cycle.Name == cycleName {
-			return nil
+			found = true
+			break
 		}
+	}
+	if !found {
+		return nil
 	}
 	q := "delete from review_cycles where name=?"
 	if _, err := db.Exec(q, cycleName, true); err != nil {
@@ -627,6 +632,20 @@ func inList(needle string, haystack []string) bool {
 		if needle == element {
 			return true
 		}
+	}
+	return false
+}
+
+func bool2int(t bool) int {
+	if t {
+		return 1
+	}
+	return 0
+}
+
+func int2bool(i int) bool {
+	if i >= 1 {
+		return true
 	}
 	return false
 }

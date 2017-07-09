@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,10 +24,10 @@ func init() {
 	flag.Int64Var(&randseed, "seed", time.Now().Unix(), "set seed to ensure given random values")
 	flag.Parse()
 	fmt.Printf("Using seed %d\n", randseed)
-	fmt.Println("Optional test flags: -randseed :int -save-db :bool -show-logs :bool")
+	fmt.Println("Optional test flags: -randseed :int -save-db :bool -show-logs :bool\n")
 }
 
-func TestAPIAdminTeam(t *testing.T) {
+func TestAPIAdminTeams(t *testing.T) {
 	/*
 		Verify we can insert teams into the system
 		Verify we can get teams inserted into the system
@@ -53,6 +54,55 @@ func TestAPIAdminTeam(t *testing.T) {
 	if got, want := len(teams), 1; got != want {
 		t.Errorf("got %d teams, want %d", got, want)
 	}
+}
+
+func TestAPIAdminCycles(t *testing.T) {
+	/*
+		Verify we get no cycles by default
+		Verify we can add cycles
+		Verify we can delete cycles
+		Verify we can edit (open/close) cycles
+	*/
+	cli, teardown := setupInstance()
+	defer teardown()
+
+	cycles, err := cli.GetCycles()
+	NoErr(t, err, "getting cycles")
+
+	if got, want := len(cycles), 0; got != want {
+		t.Errorf("got %d cycles, want %d", got, want)
+	}
+
+	NoErr(t, cli.AddCycle("cycle_1"), "adding cycle 1")
+	NoErr(t, cli.AddCycle("cycle_2"), "adding cycle 2")
+	NoErr(t, cli.AddCycle("cycle_3"), "adding cycle 3")
+
+	cycles, err = cli.GetCycles()
+	NoErr(t, err, "getting cycles after adding them")
+
+	if got, want := len(cycles), 3; got != want {
+		t.Errorf("got %d cycles, want %d", got, want)
+	}
+
+	NoErr(t, cli.DeleteCycle("cycle_3"), "deleting cycle")
+	NoErr(t, cli.EditCycle("cycle_2", false), "edit cycle")
+
+	cycles, err = cli.GetCycles()
+	NoErr(t, err, "getting cycles after adding them")
+
+	if got, want := len(cycles), 2; got != want {
+		t.Errorf("got %d cycles, want %d", got, want)
+	}
+
+	for _, cycle := range cycles {
+		if cycle.Name == "cycle_1" && cycle.IsOpen != true {
+			t.Errorf("cycle 1 is closed, should be open")
+		}
+		if cycle.Name == "cycle_2" && cycle.IsOpen != false {
+			t.Errorf("cycle 1 is open, should be closed")
+		}
+	}
+
 }
 func TestAPIUserTeam(t *testing.T) {
 	/*
@@ -94,12 +144,12 @@ func TestAPIUserTeam(t *testing.T) {
 	}
 }
 
-func NoErr(t *testing.T, err error, msg ...string) {
-	if err != nil && msg != nil {
-		message := strings.Join(msg, " ")
-		t.Errorf("%v - %s", err, message)
-	} else if err != nil {
-		t.Error(err)
+func NoErr(t *testing.T, err error, msg string) {
+	_, fl, line, _ := runtime.Caller(1)
+	path := strings.Split(fl, string(os.PathSeparator))
+	file := path[len(path)-1]
+	if err != nil {
+		t.Errorf("[%s:%d] %v - %s", file, line, err, msg)
 	}
 }
 

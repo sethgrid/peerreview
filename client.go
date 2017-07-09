@@ -19,10 +19,18 @@ type teamPayload struct {
 	Teams []string `json:"teams"`
 }
 
+type cyclePayload struct {
+	Cycles []string `json:"cycles"`
+}
+
 // NewClient eases test developement and potential interactions from other Go code bases
 func NewClient(addr string, authkey string) *Client {
 	return &Client{addr: addr, authkey: authkey}
 }
+
+// **********
+// api/admin/teams
+// *********
 
 // InsertTeam inserts a team to be available for assignment later to a user
 func (c *Client) InsertTeam(team string) error {
@@ -57,6 +65,56 @@ func (c *Client) GetTeams() ([]string, error) {
 	return data.Teams, nil
 }
 
+// **********
+// api/admin/cycles
+// *********
+
+func (c *Client) GetCycles() ([]Cycle, error) {
+	expectedCode := http.StatusOK
+	verb := "GET"
+	uri := "/api/admin/cycles"
+	b, err := c.clientDo(verb, uri, expectedCode, "")
+	if err != nil {
+		return nil, err
+	}
+	var data struct {
+		Cycles []Cycle `json:"cycles"`
+	}
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return nil, err
+	}
+	return data.Cycles, nil
+}
+
+func (c *Client) AddCycle(cycle string) error {
+	verb := "POST"
+	expectedCode := http.StatusCreated
+	uri := "/api/admin/cycles"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"cycle":"%s"}`, cycle))
+	return err
+}
+
+func (c *Client) DeleteCycle(cycle string) error {
+	verb := "DELETE"
+	expectedCode := http.StatusOK
+	uri := "/api/admin/cycles"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"cycle":"%s"}`, cycle))
+	return err
+}
+
+func (c *Client) EditCycle(cycle string, IsOpen bool) error {
+	verb := "PUT"
+	expectedCode := http.StatusOK
+	uri := "/api/admin/cycles"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"cycle":"%s", "is_open":%t}`, cycle, IsOpen))
+	return err
+}
+
+// **********
+// api/user/team
+// *********
+
 func (c *Client) GetUsersTeams() ([]string, error) {
 	expectedCode := http.StatusOK
 	verb := "GET"
@@ -88,6 +146,10 @@ func (c *Client) RemoveTeamFromUser(team string) error {
 	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"team":"%s"}`, team))
 	return err
 }
+
+// **********
+// helpers
+// *********
 
 func (c *Client) clientDo(verb string, uri string, expectedCode int, payload string) ([]byte, error) {
 	code, b, err := c.httpDo(verb, uri, payload)
