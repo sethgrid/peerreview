@@ -33,6 +33,14 @@ func (c *Client) InsertTeam(team string) error {
 	return err
 }
 
+func (c *Client) DeleteTeam(team string) error {
+	verb := "DELETE"
+	expectedCode := http.StatusOK
+	uri := "/api/admin/teams"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"team":"%s"}`, team))
+	return err
+}
+
 func (c *Client) GetUsersTeams() ([]string, error) {
 	expectedCode := http.StatusOK
 	verb := "GET"
@@ -52,6 +60,14 @@ func (c *Client) GetUsersTeams() ([]string, error) {
 func (c *Client) AssignTeamToUser(team string) error {
 	verb := "POST"
 	expectedCode := http.StatusCreated
+	uri := "/api/user/team"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"team":"%s"}`, team))
+	return err
+}
+
+func (c *Client) RemoveTeamFromUser(team string) error {
+	verb := "DELETE"
+	expectedCode := http.StatusOK
 	uri := "/api/user/team"
 	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"team":"%s"}`, team))
 	return err

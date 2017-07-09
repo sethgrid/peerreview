@@ -29,8 +29,10 @@ func init() {
 func TestAPITeam(t *testing.T) {
 	/*
 		Verify no teams are assigned by default
-		Verify we can insert teams
+		Verify we can insert teams into the system
 		Verify we can assign teams to a user
+		Verify we can remove a user from a team
+		Verify we can remove a team from the system
 	*/
 	cli, teardown := setupInstance()
 	defer teardown()
@@ -52,6 +54,16 @@ func TestAPITeam(t *testing.T) {
 	NoErr(t, err, "Get users after insert")
 
 	if got, want := len(teams), 2; got != want {
+		t.Errorf("got %d teams, want %d", got, want)
+	}
+
+	NoErr(t, cli.RemoveTeamFromUser("team_b"), "remove team b from user")
+	NoErr(t, cli.DeleteTeam("team_b"), "delete team b")
+
+	teams, err = cli.GetUsersTeams()
+	NoErr(t, err, "Get users after insert")
+
+	if got, want := len(teams), 1; got != want {
 		t.Errorf("got %d teams, want %d", got, want)
 	}
 }

@@ -203,7 +203,7 @@ func RemoveTeamFromUser(db *sql.DB, email string, team string) error {
                         FROM   teams
                         WHERE  name =?
                         LIMIT  1)
-    LIMIT 1
+    -- LIMIT 1 requires sqlite to be compiled with #define SQLITE_ENABLE_UPDATE_DELETE_LIMIT
     `
 	if _, err := db.Exec(q, email, team); err != nil {
 		return errors.Wrap(err, "unable to delete user-team link in RemoveTeamFromUser")
@@ -470,7 +470,7 @@ func DeleteCycle(db *sql.DB, cycleName string) error {
 			return nil
 		}
 	}
-	q := "delete from review_cycles where name=? limit 1"
+	q := "delete from review_cycles where name=?"
 	if _, err := db.Exec(q, cycleName, true); err != nil {
 		return errors.Wrap(err, "unable to delete review cycle")
 	}
@@ -524,7 +524,7 @@ func DeleteTeam(db *sql.DB, teamName string) error {
 		// if it is not there, don't need to delete it
 		return nil
 	}
-	q := "delete from teams where name=? limit 1"
+	q := "delete from teams where name=?"
 	if _, err := db.Exec(q, teamName, true); err != nil {
 		return errors.Wrap(err, "unable to delete review team")
 	}
