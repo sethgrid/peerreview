@@ -15,6 +15,8 @@ import (
 	"log"
 	"os"
 
+	"strings"
+
 	"github.com/pkg/errors"
 )
 
@@ -107,6 +109,14 @@ type UserInfoLite struct {
 	Email string `json:"email"`
 }
 
+func queryPP(q string, args ...string) string {
+	var i int
+	for strings.IndexAny(q, "?") != -1 {
+		q = strings.Replace(q, "?", fmt.Sprintf(`"%s"`, args[i]), 1)
+	}
+	return q
+}
+
 // GetUser returns basic user information given a user's email
 func GetUser(db *sql.DB, email string) (UserInfo, error) {
 	// could re-use GetUsersTeams below. Good for code re-use, but I wanted to play with NextResultSet().
@@ -116,16 +126,9 @@ func GetUser(db *sql.DB, email string) (UserInfo, error) {
         SELECT name,
                goals
         FROM   users
-        WHERE  email=? limit 1;
+        WHERE  email=?;
+	`
 
-        SELECT t.NAME
-        FROM   teams t
-            JOIN   user_teams ut
-              ON   ut.team_id = t.id
-            JOIN   users u
-              ON   ut.user_id = u.id
-        WHERE  u.email = ?; ;
-      `
 	rows, err := db.Query(q, email, email)
 	if err != nil {
 		return info, errors.Wrap(err, "unable to query GetUser")
@@ -139,16 +142,12 @@ func GetUser(db *sql.DB, email string) (UserInfo, error) {
 		info.Email = email
 		info.Goals = goals
 	}
-	_ = rows.NextResultSet()
-	var teams []string
-	for rows.Next() {
-		var team string
-		if err = rows.Scan(&team); err != nil {
-			return info, errors.Wrap(err, "unable to scan GetUser second result set")
-		}
-		teams = append(teams, team)
+
+	info.Teams, err = GetUsersTeams(db, email)
+	if err != nil {
+		return info, err
 	}
-	info.Teams = teams
+
 	return info, nil
 }
 
@@ -214,7 +213,7 @@ func RemoveTeamFromUser(db *sql.DB, email string, team string) error {
 
 // AssignGoalToUser sets the goal that the user wishes other reviewers to know about themselves
 func AssignGoalToUser(db *sql.DB, email string, goal string) error {
-	q := "update user set goal=? where email=? limit 1"
+	q := "update users set goals=? where email=?"
 	if _, err := db.Exec(q, goal, email); err != nil {
 		return errors.Wrap(err, "unable to set user goal in AssignGoalToUser")
 	}
@@ -574,9 +573,9 @@ func createDB(path string) error {
     create table schema_version (version text not null primary key);
     create table users (
 		id integer not null primary key,
-		name text,
+		name text not null default "",
 		email text not null,
-		goals text
+		goals text not null default ""
 	);
     create table teams (
 		id integer not null primary key,

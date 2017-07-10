@@ -35,6 +35,31 @@ When a user signs in via Google Sign-In, there is a cookie created called `auth`
 To keep the deploy of `peerreview` simple, you must bundle all the required files (html, css, javascript).
 If the schema is changed, we have to adjust the schema version variable to prevent strange run time errors on queries. There is no current live migration strategy.
 
+### Debugging
+
+When running tests, if you get an unexpected result back from the db, you can inspect the db, such as:
+
+```
+$ go test -save-db -run TestAPIUserGoal
+Using seed 1499699308
+Optional test flags: -randseed :int -save-db :bool -show-logs :bool
+
+2017/07/10 08:08:28 keeping db .test_db_1499699308_17
+--- FAIL: TestAPIUserGoal (0.01s)
+	main_test.go:165: got goal "", expected "I want to make awesome things"
+FAIL
+exit status 1
+FAIL	github.com/sethgrid/peerreview	0.042s
+08:08:28 sethammons@sammons:~/workspace/go/src/github.com/sethgrid/peerreview (git:master*:404f9cd)
+$ sqlite3 .test_db_1499699308_17
+SQLite version 3.16.0 2016-11-04 19:09:39
+Enter ".help" for usage hints.
+sqlite> select * from users;
+1|Test User|.test_db_1499699308_17@example.com|I want to make awesome things
+```
+
+In this example, we can see that the test case has trouble getting the `goals` value back from the user table, but we can see that it is indeed in the db. This gives us a jumping off point for debugging.
+
 ### Requirements
 Go1.8.1+ : there is an error in earlier versions for sqlite3. See https://github.com/golang/go/issues/19734.
 

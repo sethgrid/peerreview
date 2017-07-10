@@ -23,6 +23,14 @@ type cyclePayload struct {
 	Cycles []string `json:"cycles"`
 }
 
+type goalPayload struct {
+	Goal string `json:"goal"`
+}
+
+type userPayload struct {
+	User UserInfo `json:"user"`
+}
+
 // NewClient eases test developement and potential interactions from other Go code bases
 func NewClient(addr string, authkey string) *Client {
 	return &Client{addr: addr, authkey: authkey}
@@ -148,6 +156,46 @@ func (c *Client) RemoveTeamFromUser(team string) error {
 }
 
 // **********
+// /api/user
+// *********
+
+func (c *Client) GetUserInfo() (UserInfo, error) {
+	var data userPayload
+	expectedCode := http.StatusOK
+	verb := "GET"
+	uri := "/api/user"
+	b, err := c.clientDo(verb, uri, expectedCode, "")
+	if err != nil {
+		return data.User, err
+	}
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return data.User, err
+	}
+	return data.User, nil
+}
+
+// **********
+// /api/user/goal
+// *********
+
+func (c *Client) GetUsersGoal() (string, error) {
+	info, err := c.GetUserInfo()
+	if err != nil {
+		return "", err
+	}
+	return info.Goals, nil
+}
+
+func (c *Client) SetUserGoal(goal string) error {
+	verb := "POST"
+	expectedCode := http.StatusCreated
+	uri := "/api/user/goal"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"goal":"%s"}`, goal))
+	return err
+}
+
+// **********
 // helpers
 // *********
 
@@ -157,7 +205,7 @@ func (c *Client) clientDo(verb string, uri string, expectedCode int, payload str
 		return nil, errors.Wrapf(err, "[%d] %v", code, string(b))
 	}
 	if code != expectedCode {
-		return nil, fmt.Errorf("got %d, want %d on %s - %s", code, expectedCode, uri, string(b))
+		return nil, fmt.Errorf("got %d, want %d on %s - body: %s", code, expectedCode, uri, string(b))
 	}
 	return b, nil
 }

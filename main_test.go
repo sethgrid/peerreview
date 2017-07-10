@@ -144,6 +144,31 @@ func TestAPIUserTeam(t *testing.T) {
 	}
 }
 
+func TestAPIUserGoal(t *testing.T) {
+	cli, teardown := setupInstance()
+	defer teardown()
+
+	goal, err := cli.GetUsersGoal()
+	NoErr(t, err, "get user goal")
+
+	cli.InsertTeam("foo")
+	cli.AssignTeamToUser("foo")
+
+	if goal != "" {
+		t.Errorf("got goal %q, expected no goal", goal)
+	}
+
+	expectedGoal := "I want to make awesome things"
+	NoErr(t, cli.SetUserGoal(expectedGoal), "setting goal")
+
+	goal, err = cli.GetUsersGoal()
+	NoErr(t, err, "get user goal")
+
+	if goal != expectedGoal {
+		t.Errorf("got goal %q, expected %q", goal, expectedGoal)
+	}
+}
+
 func NoErr(t *testing.T, err error, msg string) {
 	_, fl, line, _ := runtime.Caller(1)
 	path := strings.Split(fl, string(os.PathSeparator))

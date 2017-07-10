@@ -138,7 +138,7 @@ func apiRouter(a app) http.Handler {
 
 	r.Post("/user/reviewer", a.apiUserReviewer)
 
-	r.Post("/user", a.apiUser)
+	r.Get("/user", a.apiUser)
 
 	r.Get("/admin/cycles", a.apiAdminCycles)
 	r.Post("/admin/cycles", a.apiAdminCycles)
