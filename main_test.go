@@ -142,6 +142,13 @@ func TestAPIUserTeam(t *testing.T) {
 	if got, want := len(teams), 1; got != want {
 		t.Errorf("got %d teams, want %d", got, want)
 	}
+
+	// verify that it works with the user endpoint too
+	info, err := cli.GetUserInfo()
+	NoErr(t, err, "getting user info")
+	if got, want := len(info.Teams), 1; got != want {
+		t.Errorf("got %d teams, want %d", got, want)
+	}
 }
 
 func TestAPIUserGoal(t *testing.T) {
