@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aymerick/raymond"
+	"github.com/go-chi/chi"
 )
 
 func (a app) rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -220,30 +221,13 @@ func (a app) apiUserReviewees(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, r, nil, "missing email context", http.StatusInternalServerError)
 		return
 	}
-
-	var payload struct {
-		Cycle string `json:"cycle"`
-	}
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		handleErr(w, r, err, "unable to read request body", http.StatusBadRequest)
-		return
-	}
-	err = json.Unmarshal(b, &payload)
-	if err != nil {
-		handleErr(w, r, err, `unable to marshal body. Should be {"cycle":"cycle name"}`, http.StatusBadRequest)
-		return
-	}
-	if payload.Cycle == "" {
-		handleErr(w, r, nil, "cycle cannot be empty", http.StatusBadRequest)
-		return
-	}
+	cycle := chi.URLParam(r, "cycleName")
 
 	var data struct {
 		Reviewees []UserInfoLite `json:"reviewees"`
 	}
-
-	data.Reviewees, err = GetReviewees(a.db, email, payload.Cycle)
+	var err error
+	data.Reviewees, err = GetReviewees(a.db, email, cycle)
 	if err != nil {
 		handleErr(w, r, err, "unable to get reviewees", http.StatusInternalServerError)
 		return

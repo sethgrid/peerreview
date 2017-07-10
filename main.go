@@ -131,7 +131,7 @@ func apiRouter(a app) http.Handler {
 
 	r.Post("/user/goal", a.apiUserGoal)
 
-	r.Get("/user/reviewees", a.apiUserReviewees)
+	r.Get("/user/reviewees/{cycleName}", a.apiUserReviewees)
 
 	r.Get("/user/reviews", a.apiUserReviews)
 	r.Post("/user/reviews", a.apiUserReviews)
@@ -203,8 +203,8 @@ user can see other team members (name). When they click on a team member, they c
 they user is told that the feedback is anonymous and after they submit, the cannot edit their feedback, but they can provide additional feedback if they wish. They can choose to sign their name.
 
 Resource                     Payload                                                                                                        Response
-GET     /api/user/reviewees  {"cycle": $cycle_name}                                                                                         {"reviewees": [{"name": $name, "email": $email}]} # this will populate with anyone on the same team and anyone who has requested a review from this user during this cycle
-POST    /api/user/reviews    {"reviewee_email":$email, "strengths":[$strength], "growth_opportunity":[$opportunity], "cycle": $cycle_name}  201
+GET     /api/user/reviewees/:$cycle_name                                                                                                    {"reviewees": [{"name": $name, "email": $email}]} # this will populate with anyone on the same team and anyone who has requested a review from this user during this cycle
+POST    /api/user/reviews    {"reviewee_email":$email, "strengths":[$strength], "growth_opportunities":[$opportunity], "cycle": $cycle_name}  201
 
 they can also view users who have requested that the signed in user review them (good for cross team review)
 

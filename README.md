@@ -70,7 +70,7 @@ For the app to function, you will have to hook up Google Sign-In. See above.
   - ~~set up schema versioning~~
   - ~~set up google sign-in with ability to log in and log out~~
   - ~~set up alternate auth mw handling for bearer token that has the same content as the auth cookie value. Add documentation for curling with this~~
-  - set up endpoints for all interactions
+  - ~set up endpoints for all interactions~
   - set up /dash to be a single page application
   - set up vendoring of web directory into binary
   - vendor Go dependencies

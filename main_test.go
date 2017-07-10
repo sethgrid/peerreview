@@ -176,6 +176,61 @@ func TestAPIUserGoal(t *testing.T) {
 	}
 }
 
+func TestAPIUserReviewees_APIUserReviewer(t *testing.T) {
+	cli, teardown := setupInstance()
+	defer teardown()
+
+	// set up two teams. set up team mates on user's team. Set up a user from another team
+	// set user from other team as a reviewer, make sure everyone shows up as reviewers.
+
+	NoErr(t, cli.InsertTeam("team_1"), "creating team")
+	NoErr(t, cli.InsertTeam("team_2"), "creating team")
+
+	NoErr(t, CreateUser(cli.db, "user_1", "user_1@example.com"), "creating user")
+	NoErr(t, CreateUser(cli.db, "user_2", "user_2@example.com"), "creating user")
+	NoErr(t, CreateUser(cli.db, "user_3", "user_3@example.com"), "creating user")
+
+	NoErr(t, cli.AssignTeamToUser("team_1"), "setting up user's team")
+	NoErr(t, AssignTeamToUser(cli.db, "user_1@example.com", "team_1"), "setting up team")
+	NoErr(t, AssignTeamToUser(cli.db, "user_2@example.com", "team_1"), "setting up team")
+	NoErr(t, AssignTeamToUser(cli.db, "user_3@example.com", "team_2"), "setting up team")
+
+	NoErr(t, cli.AddCycle("cycle_1"), "adding cycle")
+	NoErr(t, cli.AddReviewer("user_3@example.com", "cycle_1"), "add reviewer")
+
+	reviewees, err := cli.GetUserReviewees("cycle_1")
+	NoErr(t, err, "getting reviewees")
+
+	if len(reviewees) != 3 {
+		t.Errorf("got %d reviewees, want %d - %v", len(reviewees), 4, reviewees)
+	}
+}
+
+func TestAPIUserReviews(t *testing.T) {
+	cli, teardown := setupInstance()
+	defer teardown()
+
+	NoErr(t, cli.AddCycle("cycle_1"), "adding cycle")
+
+	err := cli.AddReviewForUser(cli.userEmail, "cycle_1", []string{"good at being awesome", "awesome at being good"}, []string{"follow through on tasks", "drive stories to completion"})
+	NoErr(t, err, "adding review for user")
+
+	reviews, err := cli.GetReviews()
+	NoErr(t, err, "error getting reviews")
+
+	if got, want := len(reviews), 1; got != want {
+		t.Fatalf("got %d review(s), want %d", got, want)
+	}
+
+	if got, want := len(reviews[0].Opportunities), 2; got != want {
+		t.Errorf("got %d opportunities, want %d", got, want)
+	}
+
+	if got, want := len(reviews[0].Strengths), 2; got != want {
+		t.Errorf("got %d strengths, want %d", got, want)
+	}
+}
+
 func NoErr(t *testing.T, err error, msg string) {
 	_, fl, line, _ := runtime.Caller(1)
 	path := strings.Split(fl, string(os.PathSeparator))
@@ -185,7 +240,15 @@ func NoErr(t *testing.T, err error, msg string) {
 	}
 }
 
-func setupInstance() (*Client, func() error) {
+// testClient embedds a *Client that will perform actions on behalf of a set auth key
+// convenience properties such as the db and the logged in user's email are provided
+type testClient struct {
+	*Client
+	db        *sql.DB
+	userEmail string
+}
+
+func setupInstance() (*testClient, func() error) {
 	r := rand.New(rand.NewSource(randseed))
 	testDB := fmt.Sprintf(".test_db_%d_%d", time.Now().Unix(), r.Intn(100))
 	err := InitDB(testDB)
@@ -222,7 +285,7 @@ func setupInstance() (*Client, func() error) {
 
 	cli := NewClient(fmt.Sprintf("http://localhost:%d", port), key)
 
-	return cli, func() error {
+	return &testClient{cli, a.db, email}, func() error {
 		if preserveTestDB {
 			log.Println("keeping db " + testDB)
 		} else {

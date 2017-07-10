@@ -31,6 +31,14 @@ type userPayload struct {
 	User UserInfo `json:"user"`
 }
 
+type revieweesPayload struct {
+	Reviewees []UserInfoLite `json:"reviewees"`
+}
+
+type reviewPayload struct {
+	Reviews []Review `json:"reviews"`
+}
+
 // NewClient eases test developement and potential interactions from other Go code bases
 func NewClient(addr string, authkey string) *Client {
 	return &Client{addr: addr, authkey: authkey}
@@ -192,6 +200,77 @@ func (c *Client) SetUserGoal(goal string) error {
 	expectedCode := http.StatusCreated
 	uri := "/api/user/goal"
 	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"goal":"%s"}`, goal))
+	return err
+}
+
+// **********
+// /api/user/reviewees
+// *********
+
+func (c *Client) GetUserReviewees(cycle string) ([]UserInfoLite, error) {
+	var data revieweesPayload
+	expectedCode := http.StatusOK
+	verb := "GET"
+	uri := "/api/user/reviewees/" + cycle
+	b, err := c.clientDo(verb, uri, expectedCode, "")
+	if err != nil {
+		return data.Reviewees, err
+	}
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return data.Reviewees, err
+	}
+	return data.Reviewees, nil
+}
+
+// **********
+// /api/user/reviewer
+// *********
+
+func (c *Client) AddReviewer(email string, cycleName string) error {
+	verb := "POST"
+	expectedCode := http.StatusCreated
+	uri := "/api/user/reviewer"
+	_, err := c.clientDo(verb, uri, expectedCode, fmt.Sprintf(`{"user_email":"%s", "cycle":"%s"}`, email, cycleName))
+	return err
+}
+
+// **********
+// /api/user/reviews
+// *********
+
+func (c *Client) GetReviews() ([]Review, error) {
+	var data reviewPayload
+	expectedCode := http.StatusOK
+	verb := "GET"
+	uri := "/api/user/reviews"
+	b, err := c.clientDo(verb, uri, expectedCode, "")
+	if err != nil {
+		return data.Reviews, err
+	}
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return data.Reviews, err
+	}
+	return data.Reviews, nil
+}
+
+func (c *Client) AddReviewForUser(email string, cycle string, strengths []string, opportunities []string) error {
+	verb := "POST"
+	expectedCode := http.StatusCreated
+	uri := "/api/user/reviews"
+	m := make(map[string]interface{})
+	m["reviewee_email"] = email
+	m["strengths"] = strengths
+	m["growth_opportunities"] = opportunities
+	m["cycle"] = cycle
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.clientDo(verb, uri, expectedCode, string(b))
 	return err
 }
 

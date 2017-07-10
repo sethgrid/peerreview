@@ -238,7 +238,7 @@ func SetUserReviewer(db *sql.DB, userEmail string, eligibleReviewer string, cycl
                 WHERE  email =?
                 LIMIT  1),
                 (SELECT id
-                FROM   review_cycle
+                FROM   review_cycles
                 WHERE  name =?
                 LIMIT  1))
     `
@@ -259,27 +259,15 @@ func GetReviewees(db *sql.DB, email string, cycle string) ([]UserInfoLite, error
                 JOIN user_teams
                     ON users.id = user_teams.user_id
         WHERE   team_id = (SELECT team_id
-                        FROM   user_teams
-                                JOIN users.id
-                                    ON user_teams.user_id
+                        FROM user_teams
+                        JOIN users
+                          ON user_teams.user_id=users.id
                         WHERE  users.email = ?
-                        LIMIT  1);
+                        )
+			    AND email <> ?
+	`
 
-        SELECT users.name,
-               users.email
-        FROM   users
-               JOIN review_requests
-                 ON reviewer_id = users.id
-               JOIN review_cycles
-                 ON review_reqeusts.cycle_id = review_cycles.id
-        WHERE  review_requests.recipient_id = (SELECT id
-                                               FROM   users
-                                               WHERE  email =?
-                                              LIMIT  1)
-               AND review_cycles.name =?;
-    `
-
-	rows, err := db.Query(q, email, email, cycle)
+	rows, err := db.Query(q, email, email)
 	if err != nil {
 		return uil, errors.Wrap(err, "unable to query for team mates in GetReviewees")
 	}
@@ -290,8 +278,26 @@ func GetReviewees(db *sql.DB, email string, cycle string) ([]UserInfoLite, error
 		}
 		uil = append(uil, UserInfoLite{Name: name, Email: email})
 	}
-	_ = rows.NextResultSet()
-	// TODO, when to check rows.Error()? between next result set, at end?
+
+	q = `
+        SELECT users.name,
+               users.email
+        FROM   users
+               JOIN review_requests
+                 ON reviewer_id = users.id
+               JOIN review_cycles
+                 ON review_requests.cycle_id = review_cycles.id
+        WHERE  review_requests.recipient_id = (SELECT id
+                                               FROM   users
+                                               WHERE  email =?
+                                              )
+               AND review_cycles.name =?;
+    `
+	rows, err = db.Query(q, email, cycle)
+	if err != nil {
+		return uil, errors.Wrap(err, "unable to query for reviewers in GetReviewees")
+	}
+
 	for rows.Next() {
 		var name, email string
 		if err = rows.Scan(&name, &email); err != nil {
@@ -316,7 +322,7 @@ func GetUserReviews(db *sql.DB, email string) ([]Review, error) {
     SELECT review_cycles.name,
            reviews.feedback,
            reviews.is_strength,
-           reviews.is_opportunity
+           reviews.is_growth_opportunity
     FROM   reviews
            JOIN users
              ON reviews.recipient_id = users.id
