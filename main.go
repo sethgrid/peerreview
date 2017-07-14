@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"time"
-
-	"net"
 
 	"github.com/facebookgo/flagenv"
 	"github.com/go-chi/chi"

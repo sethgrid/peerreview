@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-
 	"strings"
 
 	"github.com/pkg/errors"
@@ -92,6 +91,9 @@ func GetUsersTeams(db *sql.DB, email string) ([]string, error) {
 		}
 		teams = append(teams, team)
 	}
+	if rows.Err() != nil {
+		return teams, errors.Wrap(err, "error post scanning in GetUsersTeams")
+	}
 	return teams, nil
 }
 
@@ -109,6 +111,8 @@ type UserInfoLite struct {
 	Email string `json:"email"`
 }
 
+// queryPP is a query (pretty) printer, helpful for logging/deubbing.
+// it takes a parameterized query and outputs a query that is pastable into the db console.
 func queryPP(q string, args ...string) string {
 	var i int
 	for strings.IndexAny(q, "?") != -1 {
@@ -141,6 +145,9 @@ func GetUser(db *sql.DB, email string) (UserInfo, error) {
 		info.Name = name
 		info.Email = email
 		info.Goals = goals
+	}
+	if rows.Err() != nil {
+		return info, errors.Wrap(err, "error post scan in GetUser")
 	}
 
 	info.Teams, err = GetUsersTeams(db, email)
@@ -278,6 +285,9 @@ func GetReviewees(db *sql.DB, email string, cycle string) ([]UserInfoLite, error
 		}
 		uil = append(uil, UserInfoLite{Name: name, Email: email})
 	}
+	if rows.Err() != nil {
+		return uil, errors.Wrap(err, "error post scan q1 in GetReviewees")
+	}
 
 	q = `
         SELECT users.name,
@@ -304,6 +314,9 @@ func GetReviewees(db *sql.DB, email string, cycle string) ([]UserInfoLite, error
 			return uil, errors.Wrap(err, "unable to scan for reviewers in GetReviewees")
 		}
 		uil = append(uil, UserInfoLite{Name: name, Email: email})
+	}
+	if rows.Err() != nil {
+		return uil, errors.Wrap(err, "error post scan q2 in GetReviewees")
 	}
 
 	return uil, nil
@@ -359,6 +372,9 @@ func GetUserReviews(db *sql.DB, email string) ([]Review, error) {
 			r.Opportunities = append(r.Opportunities, feedback)
 		}
 		m[cycleName] = r
+	}
+	if rows.Err() != nil {
+		return nil, errors.Wrap(err, "error post scan in GetUserReviews")
 	}
 
 	for _, v := range m {
@@ -425,9 +441,8 @@ func GetCycles(db *sql.DB) ([]Cycle, error) {
 		}
 		cycles = append(cycles, Cycle{Name: name, IsOpen: isOpen})
 	}
-	// TODO add this check in other places
 	if rows.Err() != nil {
-		return cycles, errors.Wrap(rows.Err(), "rows error when getting review cycles")
+		return cycles, errors.Wrap(rows.Err(), "error post scan in GetCycles")
 	}
 	return cycles, nil
 }
@@ -504,7 +519,7 @@ func GetTeams(db *sql.DB) ([]string, error) {
 		teams = append(teams, name)
 	}
 	if rows.Err() != nil {
-		return teams, errors.Wrap(rows.Err(), "rows error when getting teams")
+		return teams, errors.Wrap(rows.Err(), "error post scan in GetTeams")
 	}
 	return teams, nil
 }
@@ -542,6 +557,7 @@ func DeleteTeam(db *sql.DB, teamName string) error {
 	return nil
 }
 
+// verifyDB makes sure that the current schema version is the same as the installed schema version
 func verifyDB(db *sql.DB) error {
 	row := db.QueryRow("select version from schema_version")
 	var detectedSchemaVersion string
@@ -632,6 +648,7 @@ func createDB(path string) error {
 	return nil
 }
 
+// inList searches for a needle in a haystack
 func inList(needle string, haystack []string) bool {
 	for _, element := range haystack {
 		if needle == element {
@@ -641,6 +658,7 @@ func inList(needle string, haystack []string) bool {
 	return false
 }
 
+// bool2int converts bool to 1 or 0
 func bool2int(t bool) int {
 	if t {
 		return 1
@@ -648,6 +666,7 @@ func bool2int(t bool) int {
 	return 0
 }
 
+// int2bool converts any positive integer to true, and all others to false
 func int2bool(i int) bool {
 	if i >= 1 {
 		return true

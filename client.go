@@ -10,10 +10,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Client contains helper methods for interacting with the peer review api
+// It is especially helpful in tests, but can be potentially used by another Go program if needed.
 type Client struct {
 	addr    string
 	authkey string
 }
+
+/*
+  various payloads that the methods will receive data upon from the peer review app
+*/
 
 type teamPayload struct {
 	Teams []string `json:"teams"`
@@ -39,7 +45,7 @@ type reviewPayload struct {
 	Reviews []Review `json:"reviews"`
 }
 
-// NewClient eases test developement and potential interactions from other Go code bases
+// NewClient creates a new *Client that eases test developement and potential interactions from other Go code bases
 func NewClient(addr string, authkey string) *Client {
 	return &Client{addr: addr, authkey: authkey}
 }
@@ -57,6 +63,7 @@ func (c *Client) InsertTeam(team string) error {
 	return err
 }
 
+// DeleteTeam removes a team. This will not work if a foreign key is violated.
 func (c *Client) DeleteTeam(team string) error {
 	verb := "DELETE"
 	expectedCode := http.StatusOK
@@ -65,6 +72,7 @@ func (c *Client) DeleteTeam(team string) error {
 	return err
 }
 
+// GetTeams returns the teams associated to the signed in user
 func (c *Client) GetTeams() ([]string, error) {
 	expectedCode := http.StatusOK
 	verb := "GET"
@@ -85,6 +93,7 @@ func (c *Client) GetTeams() ([]string, error) {
 // api/admin/cycles
 // *********
 
+// GetCycles returns all review cycles in the system
 func (c *Client) GetCycles() ([]Cycle, error) {
 	expectedCode := http.StatusOK
 	verb := "GET"
@@ -103,6 +112,7 @@ func (c *Client) GetCycles() ([]Cycle, error) {
 	return data.Cycles, nil
 }
 
+// AddCycle adds a cycle to be available for a review period
 func (c *Client) AddCycle(cycle string) error {
 	verb := "POST"
 	expectedCode := http.StatusCreated
@@ -111,6 +121,7 @@ func (c *Client) AddCycle(cycle string) error {
 	return err
 }
 
+// DeleteCycle removes a cycle from availability. It will fail if a foreign key is violated
 func (c *Client) DeleteCycle(cycle string) error {
 	verb := "DELETE"
 	expectedCode := http.StatusOK
@@ -119,6 +130,7 @@ func (c *Client) DeleteCycle(cycle string) error {
 	return err
 }
 
+// EditCycle allows for the changing of the is_open property for a review cycle
 func (c *Client) EditCycle(cycle string, IsOpen bool) error {
 	verb := "PUT"
 	expectedCode := http.StatusOK
@@ -131,6 +143,7 @@ func (c *Client) EditCycle(cycle string, IsOpen bool) error {
 // api/user/team
 // *********
 
+// GetUsersTeams returns the teams of which that the signed in user is a part
 func (c *Client) GetUsersTeams() ([]string, error) {
 	expectedCode := http.StatusOK
 	verb := "GET"
@@ -147,6 +160,7 @@ func (c *Client) GetUsersTeams() ([]string, error) {
 	return data.Teams, nil
 }
 
+// AssignTeamToUser puts the signed in user into relation with the given team
 func (c *Client) AssignTeamToUser(team string) error {
 	verb := "POST"
 	expectedCode := http.StatusCreated
@@ -155,6 +169,7 @@ func (c *Client) AssignTeamToUser(team string) error {
 	return err
 }
 
+// RemoveTeamFromUser removes the user from the given team
 func (c *Client) RemoveTeamFromUser(team string) error {
 	verb := "DELETE"
 	expectedCode := http.StatusOK
@@ -167,6 +182,7 @@ func (c *Client) RemoveTeamFromUser(team string) error {
 // /api/user
 // *********
 
+// GetUserInfo returns basic info for the signed in user
 func (c *Client) GetUserInfo() (UserInfo, error) {
 	var data userPayload
 	expectedCode := http.StatusOK
@@ -187,6 +203,7 @@ func (c *Client) GetUserInfo() (UserInfo, error) {
 // /api/user/goal
 // *********
 
+// GetUsersGoal returns the goal of the signed in user. This is a subset of GetUserInfo()
 func (c *Client) GetUsersGoal() (string, error) {
 	info, err := c.GetUserInfo()
 	if err != nil {
@@ -195,6 +212,7 @@ func (c *Client) GetUsersGoal() (string, error) {
 	return info.Goals, nil
 }
 
+// SetUserGoal allows you to set the goal of the signed in user
 func (c *Client) SetUserGoal(goal string) error {
 	verb := "POST"
 	expectedCode := http.StatusCreated
@@ -207,6 +225,7 @@ func (c *Client) SetUserGoal(goal string) error {
 // /api/user/reviewees
 // *********
 
+// GetUserReviewees returns the users who eligible to review the signed in user
 func (c *Client) GetUserReviewees(cycle string) ([]UserInfoLite, error) {
 	var data revieweesPayload
 	expectedCode := http.StatusOK
@@ -227,6 +246,7 @@ func (c *Client) GetUserReviewees(cycle string) ([]UserInfoLite, error) {
 // /api/user/reviewer
 // *********
 
+// AddReviewer allows the given user to review the signed in user during the given review cycle
 func (c *Client) AddReviewer(email string, cycleName string) error {
 	verb := "POST"
 	expectedCode := http.StatusCreated
@@ -239,6 +259,7 @@ func (c *Client) AddReviewer(email string, cycleName string) error {
 // /api/user/reviews
 // *********
 
+// GetReviews returns all reviews for the signed in user
 func (c *Client) GetReviews() ([]Review, error) {
 	var data reviewPayload
 	expectedCode := http.StatusOK
@@ -255,6 +276,7 @@ func (c *Client) GetReviews() ([]Review, error) {
 	return data.Reviews, nil
 }
 
+// AddReviewForUser creates a review for the given user
 func (c *Client) AddReviewForUser(email string, cycle string, strengths []string, opportunities []string) error {
 	verb := "POST"
 	expectedCode := http.StatusCreated
@@ -278,6 +300,7 @@ func (c *Client) AddReviewForUser(email string, cycle string, strengths []string
 // helpers
 // *********
 
+// clientDo does some basic error handling and validation around calling httpDo
 func (c *Client) clientDo(verb string, uri string, expectedCode int, payload string) ([]byte, error) {
 	code, b, err := c.httpDo(verb, uri, payload)
 	if err != nil {
@@ -289,6 +312,7 @@ func (c *Client) clientDo(verb string, uri string, expectedCode int, payload str
 	return b, nil
 }
 
+// httpDo is a streamlined way to make http calls into the peer review app
 func (c *Client) httpDo(method string, uri string, payload string) (int, []byte, error) {
 	theURL := fmt.Sprintf("%s%s", c.addr, uri)
 	var resp *http.Response

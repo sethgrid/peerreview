@@ -37,12 +37,12 @@ func (a app) rootHandler(w http.ResponseWriter, r *http.Request) {
 func (a app) dashHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
 	if email == "" {
-		log.Println("something went wrong")
+		handleErr(w, r, nil, "unable to determine logged in user's email addr", http.StatusInternalServerError)
 		return
 	}
 	tmpl, err := ioutil.ReadFile("web/templates/dash.tmpl")
 	if err != nil {
-		log.Println(err)
+		handleErr(w, r, err, "unable read dash template file", http.StatusInternalServerError)
 		return
 	}
 	ctx := map[string]string{
@@ -56,48 +56,52 @@ func (a app) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("idtoken")
 	resp, err := http.Get("https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=" + token)
 	if err != nil {
-		log.Println(err)
-		return //todo, better handling
+		handleErr(w, r, err, "unable to validate token", http.StatusInternalServerError)
+		return
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
-		return // todo, better handling
+		handleErr(w, r, err, "unable to read response body", http.StatusInternalServerError)
+		return
 	}
 	var info TokenResp
 	err = json.Unmarshal(b, &info)
 	if err != nil {
-		log.Println(err)
+		handleErr(w, r, err, "unable to unmarshal body", http.StatusInternalServerError)
 		log.Println(string(b))
-		return // todo
+		return
 	}
 	b2, err := ioutil.ReadFile("oauth_config.json")
 	if err != nil {
-		log.Println(err)
+		handleErr(w, r, err, "unable to read oauth config file", http.StatusInternalServerError)
 		return
 	}
 	var conf JSONConfig
 	err = json.Unmarshal(b2, &conf)
 	if err != nil {
-		log.Println(err)
+		handleErr(w, r, err, "unable to unmarshal config file", http.StatusInternalServerError)
 		return
 	}
 	if info.Audience != conf.Web.ClientID {
-		log.Println("client id mismatch")
+		handleErr(w, r, nil, "bad client id", http.StatusBadRequest)
 		return
 	}
 	key := RandStringRunes(keyLength)
 	SetAuth(key, info.Email, time.Now().Add(24*time.Hour))
 	err = CreateUser(a.db, info.Name, info.Email)
-	log.Println("called createUser")
 	if err != nil {
-		log.Println("error in createUser ", err) // TODO better err handling
+		handleErr(w, r, err, "unable to create user", http.StatusInternalServerError)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Write([]byte(key))
 }
+
+/////////////
+// all handlers below are for api routes, ie, /api/*/*
+// their names reflect their path
+/////////////
 
 func (a app) apiUser(w http.ResponseWriter, r *http.Request) {
 	email := r.Context().Value(ctxEmail).(string)
@@ -353,8 +357,6 @@ func (a app) apiAdminCycles(w http.ResponseWriter, r *http.Request) {
 		}
 		err = json.NewEncoder(w).Encode(data)
 		if err != nil {
-			// note, this will give an error of status code already written.
-			// TODO: have a new handler that does nto set status code?
 			handleErr(w, r, err, "unable to marshal payload", http.StatusInternalServerError)
 			return
 		}
@@ -468,19 +470,31 @@ func (a app) apiAdminTeams(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleErr is a unified way to handle all errors that need to be logged and presented to the user.
+// The err is logged internally and the msg is presented to the user.
+// TODO: if handleErr is called after w.Write(), we will get an error of multiple response.WriteHeader calls.
+// See for workarounds: https://stackoverflow.com/questions/39415827/golang-http-check-if-responsewriter-has-been-written
 func handleErr(w http.ResponseWriter, r *http.Request, err error, msg string, code int) {
 	// TODO get access to app's logger to get req id, path, etc for free
 	_, fn, line, _ := runtime.Caller(1)
-	msg = fmt.Sprintf("[ %s:%d ] %s", fn, line, msg)
+	entry := fmt.Sprintf("[ %s:%d ] %s", fn, line, msg)
 	if err == nil {
-		log.Printf("error: %s", msg)
+		log.Printf("error: %s", entry)
 	} else {
-		log.Printf("error: %s - %v", msg, err)
+		log.Printf("error: %s - %v", entry, err)
 	}
 	w.WriteHeader(code)
-	w.Write([]byte(msg))
+
+	jsonMap := make(map[string]interface{})
+	jsonMap["error"] = msg
+	err = json.NewEncoder(w).Encode(jsonMap)
+	if err != nil {
+		log.Printf("error encoding error response for json view: %v", err)
+	}
 }
 
+// AuthMW is the authentication middleware that should be used in any endpoint that requires authentication.
+// It validates either the auth cookie or the x-session-token header
 func AuthMW(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		var isAuthorized bool

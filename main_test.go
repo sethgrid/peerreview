@@ -24,7 +24,7 @@ func init() {
 	flag.Int64Var(&randseed, "seed", time.Now().Unix(), "set seed to ensure given random values")
 	flag.Parse()
 	fmt.Printf("Using seed %d\n", randseed)
-	fmt.Println("Optional test flags: -randseed :int -save-db :bool -show-logs :bool\n")
+	fmt.Printf("Optional test flags: -randseed :int -save-db :bool -show-logs :bool\n\n")
 }
 
 func TestAPIAdminTeams(t *testing.T) {
@@ -152,6 +152,10 @@ func TestAPIUserTeam(t *testing.T) {
 }
 
 func TestAPIUserGoal(t *testing.T) {
+	/*
+		Verify that a user does not start with a goal
+		Verify that we can set a user's goal
+	*/
 	cli, teardown := setupInstance()
 	defer teardown()
 
@@ -177,11 +181,14 @@ func TestAPIUserGoal(t *testing.T) {
 }
 
 func TestAPIUserReviewees_APIUserReviewer(t *testing.T) {
+	/*
+		Verify that reviewees contain all team mates and any registered reviewer
+		 - set up two teams. set up team mates on user's team. Set up a user from another team
+		 - set user from other team as a reviewer, make sure everyone shows up as reviewers.
+	*/
+
 	cli, teardown := setupInstance()
 	defer teardown()
-
-	// set up two teams. set up team mates on user's team. Set up a user from another team
-	// set user from other team as a reviewer, make sure everyone shows up as reviewers.
 
 	NoErr(t, cli.InsertTeam("team_1"), "creating team")
 	NoErr(t, cli.InsertTeam("team_2"), "creating team")
@@ -207,6 +214,11 @@ func TestAPIUserReviewees_APIUserReviewer(t *testing.T) {
 }
 
 func TestAPIUserReviews(t *testing.T) {
+	/*
+	 Verify posting a review
+	 Verify retreiving a review
+	*/
+
 	cli, teardown := setupInstance()
 	defer teardown()
 
@@ -248,6 +260,9 @@ type testClient struct {
 	userEmail string
 }
 
+// setupInstance creates a version of the application and calls its serve method.
+// each invocation of setupInstance creates a new application backed by a new db.
+// the returned function should be called in defer to clean up / remove the db.
 func setupInstance() (*testClient, func() error) {
 	r := rand.New(rand.NewSource(randseed))
 	testDB := fmt.Sprintf(".test_db_%d_%d", time.Now().Unix(), r.Intn(100))
