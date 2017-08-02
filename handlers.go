@@ -53,6 +53,7 @@ func (a app) dashHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a app) tokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Access-Control-Allow-Origin", "*")
 	token := r.FormValue("idtoken")
 	resp, err := http.Get("https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=" + token)
 	if err != nil {
@@ -520,6 +521,8 @@ func AuthMW(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 			return
 		}
+
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, ctxEmail, email)

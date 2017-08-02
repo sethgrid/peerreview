@@ -90,6 +90,7 @@ func Serve(a app, l net.Listener, showLogs bool) error {
 	// disable, as we set our own
 	// DisableTimestamp: true,
 	}
+	log.Printf("listening on :%d", l.Addr().(*net.TCPAddr).Port)
 
 	r := chi.NewRouter()
 
@@ -113,7 +114,6 @@ func Serve(a app, l net.Listener, showLogs bool) error {
 
 	// if you update the port, you have to update the Google Sign In Client
 	// at https://console.developers.google.com/apis/credentials
-	//log.Printf("listening on :%d", l.Addr().(*net.TCPAddr).Port)
 
 	if err := http.Serve(l, r); err != nil {
 		return nil

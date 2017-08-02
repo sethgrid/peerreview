@@ -60,7 +60,11 @@ sqlite> select * from users;
 
 In this example, we can see that the test case has trouble getting the `goals` value back from the user table, but we can see that it is indeed in the db. This gives us a jumping off point for debugging.
 
-### Requirements
+### GUI / Web Frontend
+
+This project leverages create-react-app and was initialized with `cd web && create-react-app peer-review`. You can run the web frontend with `cd web/peer-review && PORT=3333 yarn start`. You will need to start the Go API with port 3000.
+
+### API Requirements
 Go1.8.1+ : there is an error in earlier versions for sqlite3. See https://github.com/golang/go/issues/19734.
 
 For the app to function, you will have to hook up Google Sign-In. See above.
@@ -71,6 +75,7 @@ For the app to function, you will have to hook up Google Sign-In. See above.
   - ~~set up google sign-in with ability to log in and log out~~
   - ~~set up alternate auth mw handling for bearer token that has the same content as the auth cookie value. Add documentation for curling with this~~
   - ~set up endpoints for all interactions~
+  - set up port handling and google client secret handling so this can be set in one place and used in both back and front ends
   - set up /dash to be a single page application
   - set up vendoring of web directory into binary
   - vendor Go dependencies
